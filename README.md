@@ -1,5 +1,7 @@
 # Ceyrom
 
+[![CI](https://github.com/uditha1994/ceyrom/actions/workflows/ci.yml/badge.svg)](https://github.com/uditha1994/ceyrom/actions/workflows/ci.yml)
+
 **Ceyrom** (Ceylon + carrom) is a browser carrom game built around how Sri Lankans play at home and in clubs.
 It has its own physics engine, the full rule set, an AI with five levels, pass-and-play, server-authoritative
 online play, and English, Sinhala and Tamil throughout.
