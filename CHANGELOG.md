@@ -2,6 +2,18 @@
 
 All notable changes to Ceyrom are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- **Smoother striker:** the striker, aim and power ease toward your input instead of jumping, including the opponent's aim when you play online. Dragging keeps your grab point, and the striker slides around coins on the baseline.
+- **Better power control:** a cancel zone around the striker, pull distance that scales with the screen, steadier aiming near the striker, and a click and light buzz at every 10%. The power ring is clearer, with quarter ticks, colour zones and a percentage label.
+- **Keyboard:** held keys glide with a speed ramp, and a tap still nudges by a fine step.
+
+### Performance
+
+- The board is drawn once on its own layer and rotated by the browser's compositor, instead of being redrawn every frame. HUD updates happen at most once per frame, and the canvas density is capped at 2×. In a throttled mid-range phone profile, median frame time dropped from about 50 ms to about 17 ms while dragging, and from about 33 ms to about 17 ms during a shot.
+
 ## [0.1.0] - 2026-11-04
 
 First public release.
@@ -24,4 +36,5 @@ First public release.
 - Players are guests with signed tokens. There is no OAuth login yet.
 - The Sinhala and Tamil text needs a review by a native speaker.
 
+[Unreleased]: https://github.com/uditha1994/ceyrom/compare/v0.1.0...develop
 [0.1.0]: https://github.com/uditha1994/ceyrom/releases/tag/v0.1.0

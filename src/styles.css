@@ -1079,7 +1079,21 @@ input[type='range']:disabled {
   align-items: center;
   justify-content: center;
 }
+.board-stack {
+  position: relative;
+  line-height: 0;
+}
+.board-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 6px;
+  box-shadow: 0 0 34px rgba(10, 6, 4, 0.55);
+  will-change: transform, opacity;
+  transform-origin: 50% 50%;
+}
 .board-canvas {
+  position: relative;
   display: block;
   touch-action: none;
   user-select: none;
@@ -1239,6 +1253,12 @@ input[type='range']:disabled {
 }
 #ctl-place.invalid::-moz-range-thumb {
   border-color: var(--bad);
+}
+.power-readout {
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  font-weight: 700;
+  min-width: 4ch;
 }
 .ctl-hint {
   min-height: 1.4em;
