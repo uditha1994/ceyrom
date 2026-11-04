@@ -1,145 +1,205 @@
+<div align="center">
+
 # Ceyrom
 
+**Sri Lankan carrom in your browser.**<br>
+Flick the striker, pocket your coins, cover the queen: against the computer, with family on one screen, or with anyone online.
+
 [![CI](https://github.com/uditha1994/ceyrom/actions/workflows/ci.yml/badge.svg)](https://github.com/uditha1994/ceyrom/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-C6A878.svg)](LICENSE)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-6F4535.svg)
+![Languages](https://img.shields.io/badge/languages-English%20·%20සිංහල%20·%20தமிழ்-66705A.svg)
 
-**Ceyrom** (Ceylon + carrom) is a browser carrom game built around how Sri Lankans play at home and in clubs.
-It has its own physics engine, the full rule set, an AI with five levels, pass-and-play, server-authoritative
-online play, and English, Sinhala and Tamil throughout.
+<img src="docs/screenshots/game.jpg" alt="A game in progress: the wooden carrom board with coins scattered after the break, player cards on each side, and the striker, power and Strike controls below" width="860">
 
-Other names considered: *Pettiya*, *Thatu*, *Gedara Carrom*. Ceyrom was chosen because it's short, easy to remember, and has a free namespace.
+</div>
 
-## Run it
+---
 
-```bash
-npm install
-npm run dev            # client on http://localhost:5173 (proxies /ws and /api to :8787)
-npm run dev:server     # game server on :8787 (needed for online play only)
-```
+## Contents
 
-Production:
+- [Features](#features)
+- [Screenshots](#screenshots)
+- [Quick start](#quick-start)
+- [How to play](#how-to-play)
+- [Controls](#controls)
+- [Project structure](#project-structure)
+- [How it works](#how-it-works)
+- [Deployment](#deployment)
+- [Scripts](#scripts)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
 
-```bash
-npm run build          # client → dist/, server → dist-server/server.mjs
-PORT=8787 CEYROM_SECRET=$(openssl rand -hex 32) npm start
-```
+## Features
 
-The server serves the built client too, so one process is a complete deployment. Useful environment variables:
-
-| Variable | Meaning |
+| | |
 | --- | --- |
-| `PORT` | HTTP + WebSocket port (default 8787) |
-| `CEYROM_SECRET` | HMAC key for player tokens. If unset, one is generated in `CEYROM_DATA/secret.key` |
-| `CEYROM_DATA` | Folder for the data file and secret (default `./data`) |
-| `CEYROM_ORIGINS` | Comma-separated allowed browser origins, used when the client is hosted elsewhere (e.g. Vercel) |
-| `VITE_SERVER_URL` | Build-time server address for a client hosted on another domain |
+| **Real physics** | Made for carrom: a 74 cm ICF board, coin-to-coin and cushion collisions, friction, spin and pockets. The same shot gives exactly the same result on every device. |
+| **Proper rules** | Queen and cover, striker fouls, penalty coins (dues), last-coin rules and board scoring. Presets: Competitive (first to 25), Casual, Gedara (home rules) and Freestyle (20/10/50), plus custom rules for private rooms. |
+| **Computer opponent** | Five levels from Beginner to Expert. Higher levels aim more accurately, try rebound shots and go after the queen. The computer never bends the physics. |
+| **Play together** | Pass-and-play for 2 or 4 players, and the board turns to face whoever is shooting. Online: private rooms with a 4-letter code, invite links, quick match (1v1 and 2v2), spectators and rematches. |
+| **Fair online play** | The server checks and simulates every shot, so results can't be faked. Dropped players reconnect without losing the game. Elo ratings and leaderboards: global, Sri Lanka, weekly, monthly and friends. |
+| **Learn and practise** | A five-step tutorial on a real board, practice drills with a coach that suggests a shot, instant replay, and a daily challenge that's the same for everyone. |
+| **Three languages** | English, Sinhala (සිංහල) and Tamil (தமிழ்) throughout, with fonts chosen for each script and local number and date formats. Quick-chat phrases appear in each reader's own language. |
+| **Sri Lankan look** | Wood-grain boards, a lotus (pala peththa) centre, carved vine (liyawela) on the frame and brass corner plates. Board collection: Gedara Jak, Kandy Ebony, Galle Teak, Kitul Night. Strikers: ivory, brass, lacquer and moonstone. |
+| **Everywhere** | Phone, tablet and desktop, portrait and landscape. Touch, mouse and keyboard. Light and dark themes, reduced motion, battery saver and low-data mode. The computer, pass-and-play and practice modes work offline. |
 
-`npm run build:single` produces `dist-single/index.html`, one self-contained file for offline play (computer, pass-and-play, practice, tutorial, daily challenge).
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/menu.jpg" alt="Main menu with the Ceyrom wordmark, Play and Quick game buttons, and tiles for each mode"><br><sub>Main menu</sub></td>
+    <td width="50%"><img src="docs/screenshots/practice.jpg" alt="Practice drill with the queen at the centre and the coach's suggested line drawn from the striker"><br><sub>Practice with the coach's suggested line</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/online-room.jpg" alt="Online room showing code JRWG, two seated players and room chat"><br><sub>Private online room with invite code and quick chat</sub></td>
+    <td><img src="docs/screenshots/local-tamil.jpg" alt="Four-player pass-and-play in Tamil on a landscape phone, with a shot clock ring on the active player"><br><sub>Four players on one phone, in Tamil</sub></td>
+  </tr>
+</table>
+
+<p align="center"><img src="docs/screenshots/phone-sinhala.jpg" alt="Phone game screen in Sinhala" width="300"><br><sub>Phone layout in Sinhala</sub></p>
+
+## Quick start
+
+You need [Node.js](https://nodejs.org/) 20 or newer.
 
 ```bash
-npm test               # physics, rules, AI and server tests (Vitest)
-npm run typecheck
+git clone https://github.com/uditha1994/ceyrom.git
+cd ceyrom
+npm install
 ```
 
-## How it's built
+To play against the computer, with friends on one device, or in practice mode, start the client:
 
-```
-src/core/        Pure TypeScript, no DOM. Shared by browser and server.
-  physics.ts     Deterministic rigid-disc simulator (fixed 240 Hz step, adaptive sub-steps)
-  rules.ts       Rule engine: turns, fouls, queen and cover, dues, scoring, boards, match end
-  ai.ts          AI planner (ghost-ball aiming, rebounds, simulated look-ahead)
-  protocol.ts    WebSocket message types
-src/game/        Browser game layer
-  controller.ts  Game loop, input, AI turns, online prediction and reconciliation, HUD feed
-  renderer.ts    Canvas renderer (interpolation, trails, powder puffs, pocket animations, aim guide)
-  textures.ts    Procedural wood board, ICF markings, lotus centre, liyawela frame carving, coins
-  audio.ts       WebAudio-synthesised sounds and generative music (no audio files)
-src/ui/          React screens and components; Zustand stores
-locales/         en / si / ta translation files (i18next). No UI text is hard-coded.
-server/          Node + ws authoritative server, JSON-file store behind a Store interface
-tests/           Vitest suites
+```bash
+npm run dev
 ```
 
-### Physics
+Open http://localhost:5173.
 
-- Units are millimetres, grams and seconds on a 74 cm ICF board: pocket Ø 44.5 mm, coin Ø 31 mm at 5.5 g, striker Ø 41.2 mm at 15 g.
-- Fixed 1/240 s step that doesn't depend on frame rate. The renderer interpolates, so rendering at 60 or 120 fps looks the same.
-- Each step is split so no body moves more than 3 mm per sub-step. This is the continuous collision detection: no tunnelling, no overlaps, no teleporting.
-- Impulse contacts with restitution, Coulomb tangential friction and spin. Walls lose energy and add spin. Sliding friction slows everything to a stop.
-- The step uses only `+ − × ÷ √`, which IEEE-754 makes exact. The same shot gives bit-identical results in every browser and on the server. The test suite checks this.
+Online play also needs the game server. Run it in a second terminal:
 
-### Rules (standard)
+```bash
+npm run dev:server
+```
 
-Own coin pocketed: shoot again. Striker pocketed: foul, one of your pocketed coins goes back (or you owe a due), turn ends.
-Queen: optionally only after your first coin. It must be covered on the same or the next stroke, or it returns to the centre.
-You can't pocket your last coin, or the opponent's last coin, before the queen is covered.
-The board winner scores the opponent's remaining coins plus dues, plus 3 for the queen while their score is under 22.
-Presets:
-- **Competitive**: first to 25, 30 s shot clock
-- **Casual**: one board
-- **Gedara**: home rules, queen any time, no striker penalty
-- **Freestyle**: white 20, black 10, queen 50
-- **Custom** rules for private rooms
+The dev client forwards `/ws` and `/api` to the server on port 8787. Open two browser windows to play yourself online.
 
-### Online
+## How to play
 
-The server is authoritative. A client sends only `{striker position, direction, power, seq}`. The server checks:
+1. Each side has **9 coins**: white or black. The player who breaks plays white.
+2. Place the striker on your **baseline**, aim forward, and shoot.
+3. Pocket one of **your own coins** and you shoot again.
+4. Pocket the red **queen**, then **cover** her by pocketing one of your coins on the same or the next shot. Miss the cover and she goes back to the centre.
+5. Pocketing the **striker** is a foul: one of your pocketed coins returns to the centre and your turn ends.
+6. You can't pocket your last coin before the queen is covered.
+7. The board winner scores **1 point for each opponent coin left**, plus **3 for the queen** if they covered it. Competitive games go to 25.
 
-- turn ownership
-- phase
-- legal placement and forward direction
-- input ranges
-- a monotonic sequence number, which blocks duplicate or replayed submissions
+The tutorial in the app (**How to play** on the main menu) walks through this on a real board.
 
-The server then simulates the shot, applies the rules and broadcasts the input with the resulting state.
-The shooter's screen starts animating immediately as a prediction. Everyone else replays the same input. At rest, all clients snap to the server's state. Because the physics is deterministic, the snap is invisible.
+## Controls
 
-Online play also includes:
+| Action | Touch / mouse | Keyboard |
+| --- | --- | --- |
+| Move striker | Drag along your baseline, or use the Striker slider | <kbd>←</kbd> <kbd>→</kbd> |
+| Aim | Press the striker and pull back (slingshot), or tap where to aim | <kbd>A</kbd> <kbd>D</kbd> |
+| Power | How far you pull back, or the Power slider | <kbd>↑</kbd> <kbd>↓</kbd> |
+| Shoot | Release, or press **Strike** | <kbd>Space</kbd> |
+| Fine adjustment | — | Hold <kbd>Shift</kbd> |
+| Pause | Pause button | <kbd>Esc</kbd> |
 
-- **Rooms**: 4-letter codes, invite links (`#room-CODE`), public matchmaking (1v1 and 2v2), spectators, rematch
-- **Chat**: localized quick-chat phrases, each shown in the reader's own language
-- **Shot clock**: server-side
-- **Disconnects**: reconnection with signed tokens, and a 60 s grace before forfeit
-- **Limits**: per-connection rate limiting
-- **Ratings**: Elo, with results stored exactly once per match
-- **Leaderboards**: global, Sri Lanka, weekly, monthly and "played with"
+In Settings you can switch between **Pull back** and **Point and strike** aiming, and set the aim guide to Full, Short or Off.
 
-### AI
+## Project structure
 
-The AI makes candidate shots for every target coin and pocket: straight ghost-ball lines from many baseline positions, plus rebound shots at Hard and Expert. It ranks them by cut angle and distance, then simulates the best few with the same physics everyone uses.
-Results are scored by pocketed coins, fouls, queen and cover, and the position left for the next shot.
+```
+ceyrom/
+├── src/
+│   ├── core/          # pure TypeScript, no DOM, shared by browser and server
+│   │   ├── physics.ts   deterministic carrom physics
+│   │   ├── rules.ts     rule engine: turns, fouls, queen, scoring
+│   │   ├── ai.ts        computer opponent
+│   │   └── protocol.ts  WebSocket message types
+│   ├── game/          # browser game layer
+│   │   ├── controller.ts  game loop, input, AI turns, online sync
+│   │   ├── renderer.ts    canvas drawing and effects
+│   │   ├── textures.ts    procedural board and coins
+│   │   └── audio.ts       synthesised sound and music
+│   ├── net/           # reconnecting WebSocket client
+│   ├── store/         # Zustand stores (settings, profile, HUD)
+│   ├── i18n/          # i18next setup
+│   └── ui/            # React screens and components
+├── locales/           # en / si / ta translation files
+├── server/            # Node authoritative game server
+├── tests/             # Vitest suites
+└── docs/screenshots/
+```
 
-Difficulty changes three things:
+## How it works
 
-- how many shots it considers (4 to 44)
-- how strategic it is
-- how steady its hand is (aim error from about 3° at Beginner to 0.2° at Expert)
+**Physics.** Distances are in millimetres on a real 74 cm board (coin Ø 31 mm, 5.5 g; striker Ø 41 mm, 15 g; pocket Ø 44.5 mm). The simulation runs in fixed 1/240 s steps, separate from the frame rate, and the renderer smooths the motion between steps. Fast pieces are moved at most 3 mm at a time, so they can never pass through each other or through a cushion. The physics code uses only basic arithmetic and square roots, which give exactly the same answer on every device. So a shot plays out identically in Chrome, Safari, Firefox and on the server, and the tests check this.
 
-It never changes the physics.
+**Rules.** `src/core/rules.ts` is data in, data out, with no timers or DOM. The browser, the AI and the server all run exactly the same rules, and new modes are just new rule settings.
 
-## Status against the brief
+**Computer opponent.** For every coin and pocket the AI works out where the striker must hit, and checks that the path is clear. At Hard and Expert it also considers rebound shots. It tries its best few ideas with the same physics, scores each result (coins pocketed, fouls, the queen, what it leaves for the opponent), then plays the winner with a hand as steady as its level.
 
-Done and tested here:
+**Online.** A player sends only the shot: striker position, direction, power and a sequence number. Before accepting it, the server checks:
 
-- Phases 1, 2 and 4
-- Phase 3 online play, tested locally (two browsers)
-- Phase 5: profiles, XP and levels, achievements, cosmetic unlocks (four boards, four strikers), match history, leaderboards
+- whose turn it is
+- that the striker placement is legal and the shot goes forward
+- that the values are in range
+- that the sequence number is new, so a duplicate or replayed shot is ignored
 
-Also included from the extras list:
+The server then simulates the shot, applies the rules, and sends everyone the shot and the resulting board. The shooter's screen starts moving straight away, and everyone else replays the same shot. When the pieces stop, every screen snaps to the server's result. Because the physics is identical everywhere, that snap is invisible.
 
-- Gedara mode
-- daily challenge
-- replay of the last shot
-- ghost trail of the previous shot
-- AI coach in practice
-- shot of the match
-- spectator reactions
-- offline play
-- low-data mode
+## Deployment
 
-Not done yet:
+```bash
+npm run build                        # client → dist/, server → dist-server/server.mjs
+CEYROM_SECRET=$(openssl rand -hex 32) npm start
+```
 
-- PostgreSQL and Redis. `server/store.ts` is a JSON file behind a `Store` interface, enough for one server instance. Swap it out before scaling.
-- OAuth login. Players are anonymous guests with signed tokens.
-- Tournaments (Village Tournament, Ceylon Championship), friend invites beyond share links, voice chat.
-- Bundled font files. Fonts load from Google Fonts with system fallbacks.
-- A native-speaker review of the Sinhala and Tamil text. The translations are careful but machine-authored.
+One Node process serves the game, the API and the WebSocket on the same port.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `PORT` | `8787` | HTTP and WebSocket port |
+| `CEYROM_SECRET` | generated | Key that signs player tokens; kept in `CEYROM_DATA/secret.key` if unset |
+| `CEYROM_DATA` | `./data` | Where player and match data is saved |
+| `CEYROM_ORIGINS` | any | Allowed browser origins (comma-separated) when the client is hosted elsewhere |
+| `VITE_SERVER_URL` | same origin | Set at build time when the client and server are on different domains |
+
+Health check: `GET /api/health`. Leaderboard: `GET /api/leaderboard?scope=global|lk|weekly|monthly|friends`.
+
+For an **offline single file**, run `npm run build:single`. It writes `dist-single/index.html`, which you can open straight from disk or host anywhere. CI also attaches this file to every run as the `ceyrom-offline` artifact.
+
+## Scripts
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Client dev server with hot reload |
+| `npm run dev:server` | Game server, restarts on change |
+| `npm test` | Vitest: physics, rules, AI and server tests |
+| `npm run typecheck` | TypeScript strict check |
+| `npm run build` | Production client and server bundle |
+| `npm run build:single` | Self-contained offline `index.html` |
+| `npm start` | Run the built server |
+
+## Roadmap
+
+- [ ] PostgreSQL storage, replacing the JSON file (`server/store.ts` already sits behind a `Store` interface)
+- [ ] Google / Facebook login, replacing the current guest accounts
+- [ ] Village Tournament and Ceylon Championship modes
+- [ ] Friend list and direct challenges
+- [ ] Shot-of-the-match replay on the results screen
+- [ ] Native-speaker review of the Sinhala and Tamil text
+- [ ] Bundled fonts for fully offline typography
+
+## Contributing
+
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for the branch model (`main` ← `develop` ← `feature/*`), commit style (Conventional Commits) and pre-PR checks. Report bugs and ideas through [GitHub Issues](https://github.com/uditha1994/ceyrom/issues).
+
+## License
+
+[MIT](LICENSE). See [CHANGELOG.md](CHANGELOG.md) for release notes.
