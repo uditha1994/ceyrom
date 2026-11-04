@@ -380,7 +380,9 @@ function Controls({ ctrl, onEmoji, emojiOpen, closeEmoji }: { ctrl: React.Mutabl
           />
         </label>
         <label className="ctl-slider" htmlFor="ctl-power">
-          <span>{t('game.power')}</span>
+          <span>
+            {t('game.power')} <output htmlFor="ctl-power" className="power-readout">{Math.round(power * 100)}%</output>
+          </span>
           <input id="ctl-power" type="range" min={0} max={1} step={0.01} value={power} disabled={!canShoot} style={{ ['--fill' as string]: `${power * 100}%` }} onChange={(e) => ctrl.current?.setPower(Number(e.target.value))} />
         </label>
         <Button size="lg" onClick={() => ctrl.current?.shoot()} disabled={!canShoot || !valid} id="btn-shoot">

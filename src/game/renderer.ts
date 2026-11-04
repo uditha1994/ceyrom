@@ -33,6 +33,8 @@ export interface AimView {
   ghost: { x: number; y: number }[] | null;
   /** true when the shot is in flight (hide aim UI) */
   moving: boolean;
+  /** Pulling, but back inside the cancel zone: release does nothing. */
+  cancel?: boolean;
 }
 
 interface Particle {
@@ -577,21 +579,77 @@ export class Renderer {
       ctx.lineWidth = 2 * S;
       ctx.stroke();
     }
-    if (aim.power > 0.001 && aim.dir) {
-      const R = (STRIKER_R + 8) * S;
-      const start = -Math.PI / 2;
+    const R = (STRIKER_R + 9) * S;
+    const start = -Math.PI / 2;
+    if (aim.cancel) {
+      // inside the cancel zone: grey ring, release does nothing
       ctx.beginPath();
       ctx.arc(p.x, p.y, R, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(48,37,30,0.35)';
-      ctx.lineWidth = 3.6 * S;
+      ctx.strokeStyle = 'rgba(232,217,188,0.35)';
+      ctx.setLineDash([3 * S, 3 * S]);
+      ctx.lineWidth = 2.4 * S;
       ctx.stroke();
+      ctx.setLineDash([]);
+    } else if (aim.power > 0.001 && aim.dir) {
+      const pw = Math.min(1, aim.power);
+      // track
       ctx.beginPath();
-      ctx.arc(p.x, p.y, R, start, start + aim.power * Math.PI * 2);
-      const hue = aim.power < 0.5 ? '#66705A' : aim.power < 0.85 ? '#C6A878' : '#A33326';
+      ctx.arc(p.x, p.y, R, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(30,22,17,0.45)';
+      ctx.lineWidth = 5 * S;
+      ctx.stroke();
+      // fill: olive → brass → lacquer red as power rises
+      const hue = pw < 0.45 ? '#7E8A69' : pw < 0.8 ? '#C6A878' : '#B23A2C';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, R, start, start + pw * Math.PI * 2);
       ctx.strokeStyle = hue;
-      ctx.lineWidth = 3.6 * S;
+      ctx.lineWidth = 5 * S;
       ctx.lineCap = 'round';
       ctx.stroke();
+      ctx.lineCap = 'butt';
+      // quarter ticks so 25/50/75% are easy to hit
+      for (let k = 1; k < 4; k++) {
+        const a = start + (k / 4) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(p.x + Math.cos(a) * (R - 3.6 * S), p.y + Math.sin(a) * (R - 3.6 * S));
+        ctx.lineTo(p.x + Math.cos(a) * (R + 3.6 * S), p.y + Math.sin(a) * (R + 3.6 * S));
+        ctx.strokeStyle = 'rgba(30,22,17,0.6)';
+        ctx.lineWidth = 1.2 * S;
+        ctx.stroke();
+      }
+      if (pw >= 0.995) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, R + (4 + 2 * Math.sin(this.time * 10)) * S, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(178,58,44,0.5)';
+        ctx.lineWidth = 1.5 * S;
+        ctx.stroke();
+      }
+      // percentage label beside the striker (not behind it, where a thumb pulling back would cover it)
+      if (aim.interactive) {
+        const d = aim.dir;
+        const len = Math.sqrt(d.x * d.x + d.y * d.y) || 1;
+        let ox = -d.y / len;
+        let oy = d.x / len;
+        // keep the label on the side facing the middle of the board
+        if (ox * -striker.x + oy * -striker.y < 0) {
+          ox = -ox;
+          oy = -oy;
+        }
+        const q = this.toScreen(striker.x + ox * (STRIKER_R + 30), striker.y + oy * (STRIKER_R + 30));
+        const label = `${Math.round(pw * 100)}%`;
+        const fs = Math.max(11, 13 * S);
+        ctx.font = `700 ${fs}px Yaldevi, Catamaran, system-ui, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const tw = ctx.measureText(label).width + fs * 0.9;
+        ctx.fillStyle = 'rgba(36,27,22,0.85)';
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(q.x - tw / 2, q.y - fs * 0.8, tw, fs * 1.6, fs * 0.8);
+        else ctx.rect(q.x - tw / 2, q.y - fs * 0.8, tw, fs * 1.6);
+        ctx.fill();
+        ctx.fillStyle = '#F1E6CF';
+        ctx.fillText(label, q.x, q.y + 0.5);
+      }
     }
     if (aim.pulling) {
       const q = this.toScreen(aim.pulling.x, aim.pulling.y);
@@ -605,7 +663,7 @@ export class Renderer {
       ctx.setLineDash([]);
       ctx.beginPath();
       ctx.arc(q.x, q.y, 6 * S, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(232,217,188,0.35)';
+      ctx.fillStyle = aim.cancel ? 'rgba(232,217,188,0.2)' : 'rgba(232,217,188,0.35)';
       ctx.fill();
     }
   }

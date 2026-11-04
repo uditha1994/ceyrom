@@ -1254,6 +1254,12 @@ input[type='range']:disabled {
 #ctl-place.invalid::-moz-range-thumb {
   border-color: var(--bad);
 }
+.power-readout {
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  font-weight: 700;
+  min-width: 4ch;
+}
 .ctl-hint {
   min-height: 1.4em;
 }
