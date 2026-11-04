@@ -74,10 +74,16 @@ export function GameScreen() {
       if ((e.key === 'h' || e.key === 'H') && session.kind === 'practice') void c.suggest();
       if (c.key(e)) e.preventDefault();
     };
+    const onKeyUp = (e: KeyboardEvent) => c.keyUp(e);
+    const onBlur = () => c.releaseKeys();
     window.addEventListener('keydown', onKey);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
     return () => {
       ro.disconnect();
       window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
       c.destroy();
       ctrl.current = null;
     };

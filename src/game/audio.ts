@@ -3,7 +3,7 @@
  * tuned to sound like wood on a powdered board. Music is a quiet generative
  * pentatonic phrase on a soft marimba-like voice over a low drone.
  */
-type Sfx = 'coin' | 'striker' | 'wall' | 'pocket' | 'queen' | 'place' | 'turn' | 'foul' | 'win' | 'lose' | 'ui' | 'shoot' | 'cover';
+type Sfx = 'tick' | 'coin' | 'striker' | 'wall' | 'pocket' | 'queen' | 'place' | 'turn' | 'foul' | 'win' | 'lose' | 'ui' | 'shoot' | 'cover';
 
 class AudioEngine {
   ctx: AudioContext | null = null;
@@ -130,6 +130,10 @@ class AudioEngine {
         if (t - this.lastPlace < 0.05) return;
         this.lastPlace = t;
         this.noise(t, 0.025, 'highpass', 2500, 0.7, 0.05);
+        break;
+      case 'tick':
+        // power step: a short wooden click whose pitch rises with power
+        this.tone(t, 520 + 900 * k, 0.03, 0.05, 'triangle');
         break;
       case 'shoot':
         this.noise(t, 0.04, 'bandpass', 1200, 1.4, 0.25 * k);
