@@ -81,6 +81,10 @@ export class Renderer {
   quality: 'high' | 'low' = 'high';
   reducedMotion = false;
   private boardTex: HTMLCanvasElement | null = null;
+  /** Static board layer: drawn once per size/theme, rotated and faded by CSS (GPU compositing). */
+  private bg: HTMLCanvasElement | null;
+  private bgDirty = true;
+  private bgStyle = '';
   private sprites = new Map<string, HTMLCanvasElement>();
   private particles: Particle[] = [];
   private pockets: PocketAnim[] = [];
@@ -90,9 +94,10 @@ export class Renderer {
   private flash: { pocket: number; t: number; gold: boolean }[] = [];
   private time = 0;
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, bg: HTMLCanvasElement | null = null) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d', { alpha: true })!;
+    this.bg = bg;
   }
 
   setLook(themeId: string, skin: string, quality: 'high' | 'low', reducedMotion: boolean): void {
@@ -107,10 +112,11 @@ export class Renderer {
   invalidate(): void {
     this.boardTex = null;
     this.sprites.clear();
+    this.bgDirty = true;
   }
 
   resize(w: number, h: number, dpr: number): void {
-    const d = this.quality === 'low' ? 1 : Math.min(dpr, 2.5);
+    const d = this.quality === 'low' ? 1 : Math.min(dpr, 2);
     if (w === this.w && h === this.h && d === this.dpr) return;
     this.w = w;
     this.h = h;
@@ -119,6 +125,12 @@ export class Renderer {
     this.canvas.height = Math.round(h * d);
     this.canvas.style.width = `${w}px`;
     this.canvas.style.height = `${h}px`;
+    if (this.bg) {
+      this.bg.width = Math.round(w * d);
+      this.bg.height = Math.round(h * d);
+      this.bg.style.width = `${w}px`;
+      this.bg.style.height = `${h}px`;
+    }
     this.S = Math.min(w, h) / (2 * FULL);
     this.cx = w / 2;
     this.cy = h / 2;
@@ -219,23 +231,25 @@ export class Renderer {
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.clearRect(0, 0, this.w, this.h);
     if (!this.boardTex) this.boardTex = boardTexture(boardTheme(this.themeId), this.texScale());
+    const zoom = 0.94 + 0.06 * ease;
 
-    // board
+    // board: a separate, static layer when available (no per-frame blit of the big texture)
+    if (this.bg) {
+      if (this.bgDirty) this.drawBg();
+      const style = `rotate(${this.angle.toFixed(4)}rad) scale(${zoom.toFixed(4)})|${ease.toFixed(3)}`;
+      if (style !== this.bgStyle) {
+        this.bgStyle = style;
+        const [tf, op] = style.split('|');
+        this.bg.style.transform = tf;
+        this.bg.style.opacity = op;
+      }
+    }
     ctx.save();
     ctx.globalAlpha = ease;
     ctx.translate(this.cx, this.cy);
-    const zoom = 0.94 + 0.06 * ease;
     ctx.scale(zoom, zoom);
-    // drop shadow under the whole board
-    ctx.save();
-    ctx.shadowColor = 'rgba(10,6,4,0.55)';
-    ctx.shadowBlur = 28 * this.dpr;
-    ctx.shadowOffsetY = 10;
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(-FULL * S * 0.98, -FULL * S * 0.98, FULL * S * 1.96, FULL * S * 1.96);
-    ctx.restore();
     ctx.rotate(this.angle);
-    ctx.drawImage(this.boardTex, -FULL * S, -FULL * S, 2 * FULL * S, 2 * FULL * S);
+    if (!this.bg) ctx.drawImage(this.boardTex, -FULL * S, -FULL * S, 2 * FULL * S, 2 * FULL * S);
 
     // pocket flashes
     for (const f of this.flash) {
@@ -530,6 +544,16 @@ export class Renderer {
       ctx.lineWidth = 1 * S;
       ctx.stroke();
     }
+  }
+
+  private drawBg(): void {
+    const bg = this.bg!;
+    const ctx = bg.getContext('2d')!;
+    const S = this.S;
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.clearRect(0, 0, this.w, this.h);
+    ctx.drawImage(this.boardTex!, this.cx - FULL * S, this.cy - FULL * S, 2 * FULL * S, 2 * FULL * S);
+    this.bgDirty = false;
   }
 
   private drawStrikerUi(ctx: CanvasRenderingContext2D, striker: RenderBody, aim: AimView): void {

@@ -19,6 +19,7 @@ export function GameScreen() {
   const finish = useApp((s) => s.finish);
   const go = useApp((s) => s.go);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const bgRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const ctrl = useRef<GameController | null>(null);
   const [paused, setPaused] = useState(false);
@@ -47,7 +48,7 @@ export function GameScreen() {
         if (!p.achievements.includes('tutorial')) p.update({ achievements: [...p.achievements, 'tutorial'], xp: p.xp + 60 });
         setTutorialDone(true);
       },
-    });
+    }, bgRef.current);
     ctrl.current = c;
     const ro = new ResizeObserver(() => {
       const r = wrapRef.current!.getBoundingClientRect();
@@ -110,6 +111,8 @@ export function GameScreen() {
       <PlayerColumn which="them" />
       <div className="board-cell">
         <div className="board-wrap" ref={wrapRef}>
+          <div className="board-stack">
+          <canvas ref={bgRef} className="board-bg" aria-hidden />
           <canvas
             ref={canvasRef}
             className="board-canvas"
@@ -121,6 +124,7 @@ export function GameScreen() {
             onPointerCancel={(e) => onPointer(e, 'up')}
             onContextMenu={(e) => e.preventDefault()}
           />
+          </div>
           <Notes />
           <Banner />
           <Reactions />

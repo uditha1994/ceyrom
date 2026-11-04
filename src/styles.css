@@ -1079,7 +1079,21 @@ input[type='range']:disabled {
   align-items: center;
   justify-content: center;
 }
+.board-stack {
+  position: relative;
+  line-height: 0;
+}
+.board-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 6px;
+  box-shadow: 0 0 34px rgba(10, 6, 4, 0.55);
+  will-change: transform, opacity;
+  transform-origin: 50% 50%;
+}
 .board-canvas {
+  position: relative;
   display: block;
   touch-action: none;
   user-select: none;

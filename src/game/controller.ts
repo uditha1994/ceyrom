@@ -84,10 +84,10 @@ export class GameController {
   private challengeDone = false;
   private hiddenAt = 0;
 
-  constructor(canvas: HTMLCanvasElement, session: SessionConfig, hooks: ControllerHooks) {
+  constructor(canvas: HTMLCanvasElement, session: SessionConfig, hooks: ControllerHooks, boardLayer: HTMLCanvasElement | null = null) {
     this.session = session;
     this.hooks = hooks;
-    this.renderer = new Renderer(canvas);
+    this.renderer = new Renderer(canvas, boardLayer);
     this.state = session.initialState ? cloneState(session.initialState) : createMatch(session.rules, session.seats, session.seed);
     if (session.kind === 'practice' || session.kind === 'tutorial' || session.kind === 'challenge') this.setupSolo();
     this.applyLook();
