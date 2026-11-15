@@ -6,6 +6,7 @@ import { levelFor, useApp, useProfile } from '../../store/stores';
 import { Avatar, Mark, PetalRule, Wordmark } from '../components/Art';
 import { IconBook, IconBot, IconCalendar, IconGear, IconGlobe, IconPeople, IconPlay, IconTarget, IconTrophy } from '../components/Icons';
 import { Button, Screen, TopBar } from '../components/Kit';
+import { LiveTable } from '../components/LiveTable';
 
 export function MainMenu() {
   const { t } = useTranslation();
@@ -14,6 +15,7 @@ export function MainMenu() {
   const p = useProfile();
   const prefs = loadAiPrefs();
   const doneToday = p.daily[todayKey()] !== undefined;
+  const quick = () => start(makeAiSession(prefs));
 
   return (
     <Screen className="menu" id="screen-menu">
@@ -34,17 +36,22 @@ export function MainMenu() {
       </header>
 
       <section className="hero">
-        <Mark size={72} />
-        <Wordmark size={72} />
-        <p className="hero-tag">{t('brand.tagline')}</p>
-        <div className="hero-actions">
-          <Button size="lg" icon={<IconPlay />} onClick={() => go('mode')} id="btn-play">
-            {t('menu.play')}
-          </Button>
-          <Button size="lg" variant="secondary" icon={<IconBot />} onClick={() => start(makeAiSession(prefs))} id="btn-quick">
-            {t('menu.quick', { level: t(`ai.level.${prefs.difficulty}`) })}
-          </Button>
+        <div className="hero-copy">
+          <div className="hero-brand">
+            <Mark size={60} />
+            <Wordmark size={72} />
+          </div>
+          <p className="hero-tag">{t('brand.tagline')}</p>
+          <div className="hero-actions">
+            <Button size="lg" icon={<IconPlay />} onClick={() => go('mode')} id="btn-play">
+              {t('menu.play')}
+            </Button>
+            <Button size="lg" variant="secondary" icon={<IconBot />} onClick={quick} id="btn-quick">
+              {t('menu.quick', { level: t(`ai.level.${prefs.difficulty}`) })}
+            </Button>
+          </div>
         </div>
+        <LiveTable onSit={quick} />
       </section>
 
       <PetalRule />

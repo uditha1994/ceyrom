@@ -23,6 +23,10 @@
     "start": "Let's play"
   },
   "menu": {
+    "live": "At the table now",
+    "liveA": "Seeya",
+    "liveB": "Achchi",
+    "takeSeat": "Take a seat: start a quick game",
     "play": "Play",
     "quick": "Quick game · {{level}}",
     "more": "Game modes",
