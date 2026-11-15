@@ -216,7 +216,12 @@ function GameTopBar({ onPause }: { onPause: () => void }) {
   const scores = useHud((s) => s.scores);
   const variant = useHud((s) => s.variant);
   const queen = useHud((s) => s.queen);
-  const queenTeam = useHud((s) => s.queenTeam);
+  const queenName = useHud((s) =>
+    s.players
+      .filter((p) => p.team === s.queenTeam)
+      .map((p) => p.name)
+      .join(' & '),
+  );
   const network = useHud((s) => s.network);
   const muted = useSettings((s) => s.muted);
   const setS = useSettings((s) => s.set);
@@ -241,9 +246,9 @@ function GameTopBar({ onPause }: { onPause: () => void }) {
           </span>
         )}
         {!solo && variant === 'standard' && (
-          <span className={`queen-pill q-${queen}`} title={t(`queen.${queen}`, { team: queenTeam + 1 })}>
+          <span className={`queen-pill q-${queen}`} title={t(`queen.${queen}`, { name: queenName })}>
             <CoinDot kind="queen" size={16} />
-            <span className="queen-text">{t(`queen.${queen}`, { team: queenTeam + 1 })}</span>
+            <span className="queen-text">{t(`queen.${queen}`, { name: queenName })}</span>
           </span>
         )}
         <Button variant="ghost" icon={muted ? <IconMute /> : <IconSound />} label={t('settings.mute')} onClick={() => setS({ muted: !muted })} />

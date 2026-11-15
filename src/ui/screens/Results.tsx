@@ -26,7 +26,7 @@ export function Results() {
   const headline = local
     ? draw
       ? t('results.draw')
-      : t('results.teamWins', { name: teamName(session, state.winner) })
+      : t('results.teamWins', { name: teamName(session, state.winner), count: session.seats / 2 })
     : draw
       ? t('results.draw')
       : won

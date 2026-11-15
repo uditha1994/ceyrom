@@ -163,6 +163,13 @@ export class GameController {
     return sideOf(this.state, this.session.mySeat);
   }
 
+  private teamName(team: number): string {
+    return this.session.players
+      .filter((_, i) => teamOf(i) === team)
+      .map((p) => p.name)
+      .join(' & ');
+  }
+
   private controllerOf(seat: number) {
     return this.session.players[seat]?.controller ?? 'human';
   }
@@ -437,7 +444,8 @@ export class GameController {
       this.phase = 'transition';
       const r = this.state.results[this.state.results.length - 1];
       const winner = r.winner;
-      useHud.getState().patch({ banner: { id: ++noteId, key: 'hud.boardWon', params: { team: winner + 1, points: r.points, board: r.board } } });
+      const banner = winner < 0 ? { key: 'results.draw' } : { key: 'hud.boardWon', params: { name: this.teamName(winner), points: r.points, board: r.board } };
+      useHud.getState().patch({ banner: { id: ++noteId, ...banner } });
       this.pushHud();
       if (k !== 'online') {
         window.setTimeout(() => {

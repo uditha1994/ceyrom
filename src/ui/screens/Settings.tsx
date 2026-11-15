@@ -130,7 +130,7 @@ export function SettingsScreen() {
               ]}
             />
           </Field>
-          <Toggle id="set-lowdata" checked={s.lowData} label={t('settings.lowData')} hint={t('settings.lowDataHint')} onChange={(v) => s.set({ lowData: v, quality: v ? 'low' : s.quality })} />
+          <Toggle id="set-lowdata" checked={s.lowData} label={t('settings.lowData')} hint={t('settings.lowDataHint')} onChange={(v) => s.set({ lowData: v, quality: v ? 'low' : 'high' })} />
         </section>
 
         <section className="settings-group">
