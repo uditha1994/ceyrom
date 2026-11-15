@@ -196,7 +196,7 @@ export class GameServer {
     if (!room) return;
     if (c.spectator) {
       room.spectators.delete(c);
-      this.sendRoom(room);
+      this.settle(room);
       return;
     }
     const seat = room.seats.find((s) => s.conn === c);
@@ -216,12 +216,27 @@ export class GameServer {
     if (seat.connected) return;
     if (room.status === 'playing' && room.state) {
       this.finish(room, 1 - teamOf(idx), true);
-    } else if (room.status === 'waiting') {
-      room.seats[idx] = emptySeat();
-      if (room.hostId === seat.playerId) room.hostId = room.seats.find((s) => s.playerId)?.playerId ?? '';
-      if (room.seats.every((s) => !s.playerId) && room.spectators.size === 0) this.closeRoom(room);
-      else this.sendRoom(room);
+    } else {
+      this.vacate(room, idx);
     }
+  }
+
+  /** Free a seat outside a match, then close the room if nobody is left in it. */
+  private vacate(room: Room, idx: number): void {
+    const seat = room.seats[idx];
+    if (seat.grace) clearTimeout(seat.grace);
+    room.seats[idx] = emptySeat();
+    room.rematch.delete(seat.playerId ?? '');
+    if (room.status === 'finished') room.status = 'waiting'; // an open seat can be taken again
+    if (room.hostId === seat.playerId) room.hostId = room.seats.find((s) => s.playerId && s.connected)?.playerId ?? room.seats.find((s) => s.playerId)?.playerId ?? '';
+    this.settle(room);
+  }
+
+  /** Close a room with no live connections (unless a match is running); otherwise publish it. */
+  private settle(room: Room): void {
+    const live = room.seats.some((s) => s.conn) || room.spectators.size > 0;
+    if (!live && room.status !== 'playing') this.closeRoom(room);
+    else this.sendRoom(room);
   }
 
   private hello(c: Conn, m: Extract<ClientMsg, { type: 'hello' }>): void {
@@ -359,7 +374,7 @@ export class GameServer {
     if (c.spectator) {
       room.spectators.delete(c);
       c.room = null;
-      this.sendRoom(room);
+      this.settle(room);
       return;
     }
     const idx = room.seats.findIndex((s) => s.conn === c);
@@ -375,10 +390,7 @@ export class GameServer {
       seat.grace = setTimeout(() => this.graceExpired(room, idx), this.graceMs);
       return;
     }
-    room.seats[idx] = emptySeat();
-    if (room.hostId === c.id) room.hostId = room.seats.find((s) => s.playerId)?.playerId ?? '';
-    if (room.seats.every((s) => !s.playerId)) this.closeRoom(room);
-    else this.sendRoom(room);
+    this.vacate(room, idx);
   }
 
   private closeRoom(room: Room): void {

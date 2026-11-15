@@ -139,7 +139,7 @@
     "turnOf": "{{name}} to play",
     "badPlacement": "The striker can't sit on a coin. Move it along the line.",
     "badDirection": "Aim forward, away from your baseline.",
-    "boardWon": "Board {{board}} to team {{team}} · +{{points}}",
+    "boardWon": "Board {{board}} to {{name}} · +{{points}}",
     "rejected": "The server didn't accept that shot. Board resynced."
   },
   "note": {
@@ -162,7 +162,7 @@
     "disconnected": "{{name}} lost connection",
     "reconnected": "{{name}} is back"
   },
-  "queen": { "board": "Queen on board", "pending": "Cover the queen", "covered": "Queen to team {{team}}" },
+  "queen": { "board": "Queen on board", "pending": "Cover the queen", "covered": "Queen: {{name}}" },
   "pause": {
     "title": "Paused",
     "resume": "Resume",
@@ -198,6 +198,7 @@
     "lost": "Good game",
     "draw": "It's a draw",
     "teamWins": "{{name}} win",
+    "teamWins_one": "{{name}} wins",
     "forfeit": "Won by forfeit after a disconnect.",
     "player": "Player",
     "shots": "Shots",
@@ -349,6 +350,7 @@
     "chatEmpty": "Say hello, {{name}}.",
     "chatPlaceholder": "Message",
     "send": "Send",
+    "ready": "Ready",
     "offlineTitle": "Can't reach the game server",
     "offlineBody": "Online play needs the Ceyrom server. Computer, pass-and-play and practice all work offline."
   },

@@ -94,6 +94,29 @@ describe('game server', () => {
     expect(server.leaderboard('global')[0].id).toBe(id);
   });
 
+  it('closes a finished room once nobody is connected, and frees seats for new players', async () => {
+    const { server, a, b, code } = setup(40);
+    a.send({ type: 'start' });
+    server.disconnect(b.conn); // Bilal drops and never returns
+    await wait(120);
+    expect(a.last('over')!.forfeit).toBe(true);
+    expect(server.rooms.has(code)).toBe(true); // Amali is still in the room
+    a.send({ type: 'leave' });
+    expect(server.rooms.has(code)).toBe(false);
+  });
+
+  it('keeps a waiting room open while a spectator is in it', () => {
+    const { server, a, b, code } = setup();
+    const c = client(server);
+    c.send({ type: 'hello', name: 'Chathu', avatar: 3, country: 'LK' });
+    c.send({ type: 'join', code, spectate: true });
+    a.send({ type: 'leave' });
+    b.send({ type: 'leave' });
+    expect(server.rooms.has(code)).toBe(true);
+    c.send({ type: 'leave' });
+    expect(server.rooms.has(code)).toBe(false);
+  });
+
   it('pairs quick-match players', () => {
     const server = new GameServer(new MemoryStore(), { secret: 's' });
     const a = client(server);

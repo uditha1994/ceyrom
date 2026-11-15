@@ -10,6 +10,18 @@ All notable changes to Ceyrom are listed here. The format follows [Keep a Change
 - **Better power control:** a cancel zone around the striker, pull distance that scales with the screen, steadier aiming near the striker, and a click and light buzz at every 10%. The power ring is clearer, with quarter ticks, colour zones and a percentage label.
 - **Keyboard:** held keys glide with a speed ramp, and a tap still nudges by a fine step.
 
+### Fixed
+
+- Switching to another tab and back left the game frozen with no pause menu.
+- Opening the "Leave game?" dialog silently un-paused the game.
+- Enter or Space on a focused button also fired a shot, and arrow keys on a slider also moved the striker.
+- An interrupted touch fired the shot. A second finger could take over a drag.
+- Leaving right after a match ended still jumped to the results screen.
+- Spectators were given a win or loss, XP and achievements.
+- The lobby could open blank after asking for a rematch, and leaving it while searching left you in the matchmaking queue.
+- The server never closed a finished room if the other player had disconnected.
+- The board banner and queen status said "team 2" in one-on-one games. They now show player names.
+
 ### Performance
 
 - The board is drawn once on its own layer and rotated by the browser's compositor, instead of being redrawn every frame. HUD updates happen at most once per frame, and the canvas density is capped at 2×. In a throttled mid-range phone profile, median frame time dropped from about 50 ms to about 17 ms while dragging, and from about 33 ms to about 17 ms during a shot.
