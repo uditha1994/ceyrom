@@ -20,13 +20,18 @@ export function Results() {
   }, [result, go]);
   if (!result) return null;
   const { state, session, myTeam } = result;
-  const local = session.kind === 'local';
+  // pass-and-play and spectating have no "you": name the winners instead
+  const local = session.kind === 'local' || !!session.spectator;
+  const toMenu = () => {
+    if (session.kind === 'online') net.leaveRoom(); // don't keep a seat in a finished room
+    go('menu', { replace: true });
+  };
   const won = state.winner === myTeam;
   const draw = state.winner === -1;
   const headline = local
     ? draw
       ? t('results.draw')
-      : t('results.teamWins', { name: teamName(session, state.winner) })
+      : t('results.teamWins', { name: teamName(session, state.winner), count: session.seats / 2 })
     : draw
       ? t('results.draw')
       : won
@@ -39,7 +44,7 @@ export function Results() {
   const rematch = () => {
     if (session.kind === 'ai') start(makeAiSession({ ...loadAiPrefs(), difficulty: session.difficulty ?? 'medium' }));
     else if (session.kind === 'online') {
-      net.send({ type: 'rematch' });
+      if (!session.spectator) net.send({ type: 'rematch' });
       go('lobby', { replace: true });
     } else start({ ...session, seed: (Math.random() * 1e9) | 0, initialState: undefined });
   };
@@ -131,7 +136,7 @@ export function Results() {
       </section>
 
       <div className="results-actions">
-        <Button variant="secondary" size="lg" onClick={() => go('menu', { replace: true })}>
+        <Button variant="secondary" size="lg" onClick={toMenu}>
           {t('common.menu')}
         </Button>
         <Button size="lg" icon={<IconRefresh />} onClick={rematch} id="btn-rematch">

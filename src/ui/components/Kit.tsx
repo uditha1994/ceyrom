@@ -1,5 +1,5 @@
 /** Ceyrom UI kit: buttons, cards, segmented controls, sliders, dialogs, top bars. */
-import { ReactNode, useEffect, useRef } from 'react';
+import { ReactNode, useEffect, useId, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { audio } from '../../game/audio';
 import { useApp } from '../../store/stores';
@@ -140,6 +140,7 @@ export function Screen({ children, className = '', id }: { children: ReactNode; 
 
 export function Dialog({ open, onClose, title, children, actions }: { open: boolean; onClose: () => void; title: string; children: ReactNode; actions?: ReactNode }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   useEffect(() => {
     const d = ref.current;
     if (!d) return;
@@ -147,9 +148,11 @@ export function Dialog({ open, onClose, title, children, actions }: { open: bool
     if (!open && d.open) d.close();
   }, [open]);
   return (
-    <dialog ref={ref} className="dialog" onClose={onClose} onCancel={(e) => (e.preventDefault(), onClose())} aria-labelledby="dialog-title">
+    // No onClose handler on purpose: the native `close` event also fires when we close the
+    // dialog ourselves (e.g. to swap to another dialog), which is not the user dismissing it.
+    <dialog ref={ref} className="dialog" onCancel={(e) => (e.preventDefault(), onClose())} aria-labelledby={titleId}>
       <div className="dialog-card">
-        <h2 id="dialog-title">{title}</h2>
+        <h2 id={titleId}>{title}</h2>
         <div className="dialog-body">{children}</div>
         {actions && <div className="dialog-actions">{actions}</div>}
       </div>

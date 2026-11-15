@@ -172,6 +172,8 @@ export interface SessionConfig {
   difficulty?: Difficulty;
   initialState?: MatchState;
   initialTurnMs?: number | null;
+  /** Watching an online match: no input, no rewards. */
+  spectator?: boolean;
 }
 
 export interface MatchResult {

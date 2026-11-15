@@ -25,8 +25,8 @@ export function Lobby() {
   const toast = useApp((s) => s.toast);
   const profileName = useProfile((s) => s.name);
   const [status, setStatus] = useState<NetStatus>(net.status);
-  const [room, setRoom] = useState<RoomInfo | null>(null);
-  const [you, setYou] = useState<{ seat: number; spectator: boolean }>({ seat: -1, spectator: false });
+  const [room, setRoom] = useState<RoomInfo | null>(net.lastRoom?.room ?? null);
+  const [you, setYou] = useState<{ seat: number; spectator: boolean }>(net.lastRoom?.you ?? { seat: -1, spectator: false });
   const [queue, setQueue] = useState<{ mode: RoomMode; waiting: number } | null>(null);
   const [code, setCode] = useState(() => (location.hash.startsWith('#room-') ? location.hash.slice(6).toUpperCase() : ''));
   const [mode, setMode] = useState<RoomMode>('1v1');
@@ -35,6 +35,8 @@ export function Lobby() {
   const [msg, setMsg] = useState('');
   const [view, setView] = useState<'home' | 'create'>('home');
   const autoJoin = useRef(code.length > 0);
+  const queued = useRef(false);
+  queued.current = queue !== null;
 
   useEffect(() => {
     const offS = net.onStatus(setStatus);
@@ -81,6 +83,7 @@ export function Lobby() {
             roomCode: m.room.code,
             initialState: m.state,
             initialTurnMs: m.turnMs,
+            spectator,
           });
           break;
         }
@@ -90,6 +93,9 @@ export function Lobby() {
     if (net.status === 'open' && autoJoin.current && code) {
       autoJoin.current = false;
       net.send({ type: 'join', code });
+    } else if (net.status === 'open' && net.room) {
+      // coming back from a match (or a rematch request): ask for the room as it is now
+      net.send({ type: 'resume', code: net.room });
     }
     return () => {
       off();
@@ -97,6 +103,14 @@ export function Lobby() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [you.spectator]);
+
+  // leaving the lobby while still searching would leave a ghost in the queue
+  useEffect(
+    () => () => {
+      if (queued.current) net.send({ type: 'cancelQuick' });
+    },
+    [],
+  );
 
   const leave = () => {
     net.leaveRoom();
@@ -287,6 +301,7 @@ export function Lobby() {
                         {s.playerId ? ` · ${s.rating}` : ''}
                         {s.playerId === room.hostId ? ` · ${t('lobby.host')}` : ''}
                         {s.playerId && !s.connected ? ` · ${t('game.offline')}` : ''}
+                        {room.status === 'finished' && s.playerId && room.rematch.includes(s.playerId) ? ` · ${t('lobby.ready')}` : ''}
                       </small>
                     </span>
                   </li>
@@ -297,13 +312,15 @@ export function Lobby() {
                 <Button variant="ghost" onClick={leave}>
                   {t('lobby.leave')}
                 </Button>
-                {isHost && (
+                {isHost && !you.spectator && (
                   <Button onClick={() => net.send({ type: 'start' })} disabled={!full} id="btn-start-room">
                     {full ? t('lobby.start') : t('lobby.waiting')}
                   </Button>
                 )}
-                {room.status === 'finished' && !isHost && (
-                  <Button onClick={() => net.send({ type: 'rematch' })}>{t('results.rematch')}</Button>
+                {room.status === 'finished' && !isHost && !you.spectator && (
+                  <Button disabled={!!net.playerId && room.rematch.includes(net.playerId)} onClick={() => net.send({ type: 'rematch' })}>
+                    {net.playerId && room.rematch.includes(net.playerId) ? t('lobby.ready') : t('results.rematch')}
+                  </Button>
                 )}
               </div>
             </section>

@@ -4,11 +4,31 @@ All notable changes to Ceyrom are listed here. The format follows [Keep a Change
 
 ## [Unreleased]
 
+### Added
+
+- **Live table on the main menu:** two computer players play a real match in front of you, shown in perspective. Click the board to start a quick game.
+- **Board-shaped mode menu:** the four modes sit in the four quarters of a carrom board, and the queen in the centre starts a quick game.
+- **Coin tray:** each player card shows nine slots that fill as coins are pocketed, plus a queen slot.
+- **Table talk:** shot notes use "Aiyo!", "Shaa!" and "Niyamai!" (with Sinhala and Tamil equivalents), and computer players sometimes react with an emoji.
+- `CEYROM_GRACE_MS` server setting for the reconnect grace period.
+
 ### Changed
 
 - **Smoother striker:** the striker, aim and power ease toward your input instead of jumping, including the opponent's aim when you play online. Dragging keeps your grab point, and the striker slides around coins on the baseline.
 - **Better power control:** a cancel zone around the striker, pull distance that scales with the screen, steadier aiming near the striker, and a click and light buzz at every 10%. The power ring is clearer, with quarter ticks, colour zones and a percentage label.
 - **Keyboard:** held keys glide with a speed ramp, and a tap still nudges by a fine step.
+
+### Fixed
+
+- Switching to another tab and back left the game frozen with no pause menu.
+- Opening the "Leave game?" dialog silently un-paused the game.
+- Enter or Space on a focused button also fired a shot, and arrow keys on a slider also moved the striker.
+- An interrupted touch fired the shot. A second finger could take over a drag.
+- Leaving right after a match ended still jumped to the results screen.
+- Spectators were given a win or loss, XP and achievements.
+- The lobby could open blank after asking for a rematch, and leaving it while searching left you in the matchmaking queue.
+- The server never closed a finished room if the other player had disconnected.
+- The board banner and queen status said "team 2" in one-on-one games. They now show player names.
 
 ### Performance
 

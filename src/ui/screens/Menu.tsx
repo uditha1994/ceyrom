@@ -6,6 +6,7 @@ import { levelFor, useApp, useProfile } from '../../store/stores';
 import { Avatar, Mark, PetalRule, Wordmark } from '../components/Art';
 import { IconBook, IconBot, IconCalendar, IconGear, IconGlobe, IconPeople, IconPlay, IconTarget, IconTrophy } from '../components/Icons';
 import { Button, Screen, TopBar } from '../components/Kit';
+import { LiveTable } from '../components/LiveTable';
 
 export function MainMenu() {
   const { t } = useTranslation();
@@ -14,6 +15,7 @@ export function MainMenu() {
   const p = useProfile();
   const prefs = loadAiPrefs();
   const doneToday = p.daily[todayKey()] !== undefined;
+  const quick = () => start(makeAiSession(prefs));
 
   return (
     <Screen className="menu" id="screen-menu">
@@ -34,17 +36,22 @@ export function MainMenu() {
       </header>
 
       <section className="hero">
-        <Mark size={72} />
-        <Wordmark size={72} />
-        <p className="hero-tag">{t('brand.tagline')}</p>
-        <div className="hero-actions">
-          <Button size="lg" icon={<IconPlay />} onClick={() => go('mode')} id="btn-play">
-            {t('menu.play')}
-          </Button>
-          <Button size="lg" variant="secondary" icon={<IconBot />} onClick={() => start(makeAiSession(prefs))} id="btn-quick">
-            {t('menu.quick', { level: t(`ai.level.${prefs.difficulty}`) })}
-          </Button>
+        <div className="hero-copy">
+          <div className="hero-brand">
+            <Mark size={60} />
+            <Wordmark size={72} />
+          </div>
+          <p className="hero-tag">{t('brand.tagline')}</p>
+          <div className="hero-actions">
+            <Button size="lg" icon={<IconPlay />} onClick={() => go('mode')} id="btn-play">
+              {t('menu.play')}
+            </Button>
+            <Button size="lg" variant="secondary" icon={<IconBot />} onClick={quick} id="btn-quick">
+              {t('menu.quick', { level: t(`ai.level.${prefs.difficulty}`) })}
+            </Button>
+          </div>
         </div>
+        <LiveTable onSit={quick} />
       </section>
 
       <PetalRule />
@@ -78,28 +85,45 @@ function MenuTile({ icon, title, sub, onClick }: { icon: JSX.Element; title: str
   );
 }
 
+/** Mode select laid out as a carrom board: four modes in the quarters, the queen starts a quick game. */
 export function ModeSelect() {
   const { t } = useTranslation();
   const go = useApp((s) => s.go);
+  const start = useApp((s) => s.startSession);
+  const prefs = loadAiPrefs();
   const modes = [
-    { id: 'aiSetup' as const, icon: <IconBot size={34} />, title: t('mode.ai.title'), sub: t('mode.ai.long'), tag: t('mode.single') },
-    { id: 'practice' as const, icon: <IconTarget size={34} />, title: t('mode.practice.title'), sub: t('mode.practice.long'), tag: t('mode.single') },
-    { id: 'localSetup' as const, icon: <IconPeople size={34} />, title: t('mode.local.title'), sub: t('mode.local.long'), tag: t('mode.multi') },
-    { id: 'lobby' as const, icon: <IconGlobe size={34} />, title: t('mode.online.title'), sub: t('mode.online.long'), tag: t('mode.multi') },
+    { id: 'aiSetup' as const, icon: <IconBot size={30} />, title: t('mode.ai.title'), sub: t('mode.ai.sub') },
+    { id: 'lobby' as const, icon: <IconGlobe size={30} />, title: t('mode.online.title'), sub: t('mode.online.sub') },
+    { id: 'localSetup' as const, icon: <IconPeople size={30} />, title: t('mode.local.title'), sub: t('mode.local.sub') },
+    { id: 'practice' as const, icon: <IconTarget size={30} />, title: t('mode.practice.title'), sub: t('mode.practice.sub') },
   ];
   return (
     <Screen id="screen-mode">
       <TopBar title={t('mode.title')} />
-      <div className="mode-grid">
-        {modes.map((m) => (
-          <button key={m.id} type="button" className="mode-card" onClick={() => go(m.id)}>
-            <span className="mode-tag">{m.tag}</span>
-            <span className="mode-icon">{m.icon}</span>
-            <strong>{m.title}</strong>
-            <span className="muted">{m.sub}</span>
+      <div className="mode-board">
+        <div className="mode-surface">
+          <svg className="mode-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
+            <circle cx="50" cy="50" r="13" />
+            <circle cx="50" cy="50" r="14.2" />
+          </svg>
+          {['tl', 'tr', 'bl', 'br'].map((c) => (
+            <span key={c} className={`mode-pocket ${c}`} aria-hidden />
+          ))}
+          <div className="mode-quads">
+            {modes.map((m) => (
+              <button key={m.id} type="button" className="mode-quad" onClick={() => go(m.id)}>
+                <span className="mode-icon">{m.icon}</span>
+                <strong>{m.title}</strong>
+                <small>{m.sub}</small>
+              </button>
+            ))}
+          </div>
+          <button type="button" className="mode-queen" onClick={() => start(makeAiSession(prefs))} aria-label={t('menu.quick', { level: t(`ai.level.${prefs.difficulty}`) })} id="btn-queen">
+            <IconPlay size={30} />
           </button>
-        ))}
+        </div>
       </div>
+      <p className="mode-hint muted">{t('mode.hint', { level: t(`ai.level.${prefs.difficulty}`) })}</p>
     </Screen>
   );
 }

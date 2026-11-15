@@ -40,6 +40,8 @@ type Phase = HudState['phase'];
 export interface ControllerHooks {
   onEnd: (state: MatchState, extra: { forfeit?: boolean; ratings?: Record<string, { before: number; after: number }>; shots: number }) => void;
   onTutorialDone?: () => void;
+  /** The tab was hidden mid-game: the screen should show its pause menu. */
+  onAutoPause?: () => void;
 }
 
 const DT = PHYS.dt;
@@ -132,7 +134,8 @@ export class GameController {
     if (document.hidden) {
       this.hiddenAt = performance.now();
       audio.suspend(true);
-      if (this.session.kind !== 'online' && !this.paused) this.setPaused(true);
+      // the screen owns the pause state, so it can show the pause menu when the player returns
+      if (this.session.kind !== 'online' && !this.paused && this.phase !== 'over') this.hooks.onAutoPause?.();
     } else {
       audio.suspend(false);
       // a shot that was in flight while hidden: finish instantly instead of fast-forwarding visibly
@@ -158,6 +161,27 @@ export class GameController {
     const k = this.session.kind;
     if (k === 'local') return sideOf(this.state, this.state.turn);
     return sideOf(this.state, this.session.mySeat);
+  }
+
+  /** Computer players react now and then, the way someone across the table would. Never at your fouls. */
+  private aiReact(out: ShotOutcome): void {
+    const shooterIsAi = this.controllerOf(out.seat) === 'ai';
+    const watching = this.session.players.map((_, i) => i).filter((i) => i !== out.seat && this.controllerOf(i) === 'ai');
+    const onlooker = watching[Math.floor(Math.random() * watching.length)] ?? -1;
+    let seat = -1;
+    let emoji = '';
+    if (out.notes.includes('queen.covered')) [seat, emoji] = shooterIsAi ? [out.seat, '🎯'] : [onlooker, '👏'];
+    else if (out.scored >= 2) [seat, emoji] = shooterIsAi ? [out.seat, '🔥'] : [onlooker, '👏'];
+    else if (out.foul && shooterIsAi) [seat, emoji] = [out.seat, '😅'];
+    if (seat < 0 || Math.random() > 0.8) return;
+    window.setTimeout(() => !this.destroyed && this.react(seat, emoji, false), 550);
+  }
+
+  private teamName(team: number): string {
+    return this.session.players
+      .filter((_, i) => teamOf(i) === team)
+      .map((p) => p.name)
+      .join(' & ');
   }
 
   private controllerOf(seat: number) {
@@ -406,6 +430,7 @@ export class GameController {
       this.renderer.celebrate();
     }
     if (out.foul) haptic([40, 60, 40], useSettings.getState().vibration);
+    if (this.session.kind === 'ai') this.aiReact(out);
     if (out.scored >= 3) this.note('note.hatTrick', 'good', { name, n: out.scored });
 
     const k = this.session.kind;
@@ -424,17 +449,18 @@ export class GameController {
       this.pushHud();
       const winTeam = this.state.winner;
       const mine = teamOf(this.session.mySeat);
-      const human = k === 'local' || winTeam === mine;
+      const human = k === 'local' || (this.session.spectator ? winTeam >= 0 : winTeam === mine);
       audio.play(human && winTeam >= 0 ? 'win' : 'lose');
       if (human) this.renderer.celebrate();
-      window.setTimeout(() => this.hooks.onEnd(this.state, { shots: this.shots }), 1800);
+      window.setTimeout(() => !this.destroyed && this.hooks.onEnd(this.state, { shots: this.shots }), 1800);
       return;
     }
     if (out.boardOver) {
       this.phase = 'transition';
       const r = this.state.results[this.state.results.length - 1];
       const winner = r.winner;
-      useHud.getState().patch({ banner: { id: ++noteId, key: 'hud.boardWon', params: { team: winner + 1, points: r.points, board: r.board } } });
+      const banner = winner < 0 ? { key: 'results.draw' } : { key: 'hud.boardWon', params: { name: this.teamName(winner), points: r.points, board: r.board } };
+      useHud.getState().patch({ banner: { id: ++noteId, ...banner } });
       this.pushHud();
       if (k !== 'online') {
         window.setTimeout(() => {
@@ -691,9 +717,12 @@ export class GameController {
         this.phase = 'over';
         this.state = m.state;
         this.pushHud();
-        audio.play(m.winner === teamOf(this.session.mySeat) ? 'win' : 'lose');
-        if (m.winner === teamOf(this.session.mySeat)) this.renderer.celebrate();
-        window.setTimeout(() => this.hooks.onEnd(this.state, { forfeit: m.forfeit, ratings: m.ratings, shots: this.shots }), 1600);
+        {
+          const cheer = this.session.spectator ? m.winner >= 0 : m.winner === teamOf(this.session.mySeat);
+          audio.play(cheer ? 'win' : 'lose');
+          if (cheer) this.renderer.celebrate();
+        }
+        window.setTimeout(() => !this.destroyed && this.hooks.onEnd(this.state, { forfeit: m.forfeit, ratings: m.ratings, shots: this.shots }), 1600);
         break;
       case 'error':
         if (m.code === 'not_your_turn' || m.code === 'invalid_shot') {
@@ -850,6 +879,7 @@ export class GameController {
 
   pointerDown(px: number, py: number, id: number): boolean {
     if (this.phase !== 'aim' || !this.isMyTurn() || this.paused) return false;
+    if (this.pointer.mode !== null) return false; // a second finger must not hijack the drag
     audio.unlock();
     const p = this.renderer.toBoard(px, py);
     const side = this.side();
@@ -949,6 +979,16 @@ export class GameController {
         this.pushHud();
       }
     }
+  }
+
+  /** The system took the touch away (gesture, call, lost capture): drop the drag without shooting. */
+  pointerCancel(id: number): void {
+    if (this.pointer.id !== id) return;
+    const mode = this.pointer.mode;
+    this.pointer = { mode: null, id: -1, startPx: { x: 0, y: 0 } };
+    this.pulling = null;
+    if (mode === 'pull') this.aim.power = 0;
+    this.pushHud();
   }
 
   private static HOLD_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'a', 'A', 'd', 'D', ',', '.']);
