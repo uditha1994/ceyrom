@@ -40,6 +40,8 @@ type Phase = HudState['phase'];
 export interface ControllerHooks {
   onEnd: (state: MatchState, extra: { forfeit?: boolean; ratings?: Record<string, { before: number; after: number }>; shots: number }) => void;
   onTutorialDone?: () => void;
+  /** The tab was hidden mid-game: the screen should show its pause menu. */
+  onAutoPause?: () => void;
 }
 
 const DT = PHYS.dt;
@@ -132,7 +134,8 @@ export class GameController {
     if (document.hidden) {
       this.hiddenAt = performance.now();
       audio.suspend(true);
-      if (this.session.kind !== 'online' && !this.paused) this.setPaused(true);
+      // the screen owns the pause state, so it can show the pause menu when the player returns
+      if (this.session.kind !== 'online' && !this.paused && this.phase !== 'over') this.hooks.onAutoPause?.();
     } else {
       audio.suspend(false);
       // a shot that was in flight while hidden: finish instantly instead of fast-forwarding visibly
@@ -424,10 +427,10 @@ export class GameController {
       this.pushHud();
       const winTeam = this.state.winner;
       const mine = teamOf(this.session.mySeat);
-      const human = k === 'local' || winTeam === mine;
+      const human = k === 'local' || (this.session.spectator ? winTeam >= 0 : winTeam === mine);
       audio.play(human && winTeam >= 0 ? 'win' : 'lose');
       if (human) this.renderer.celebrate();
-      window.setTimeout(() => this.hooks.onEnd(this.state, { shots: this.shots }), 1800);
+      window.setTimeout(() => !this.destroyed && this.hooks.onEnd(this.state, { shots: this.shots }), 1800);
       return;
     }
     if (out.boardOver) {
@@ -691,9 +694,12 @@ export class GameController {
         this.phase = 'over';
         this.state = m.state;
         this.pushHud();
-        audio.play(m.winner === teamOf(this.session.mySeat) ? 'win' : 'lose');
-        if (m.winner === teamOf(this.session.mySeat)) this.renderer.celebrate();
-        window.setTimeout(() => this.hooks.onEnd(this.state, { forfeit: m.forfeit, ratings: m.ratings, shots: this.shots }), 1600);
+        {
+          const cheer = this.session.spectator ? m.winner >= 0 : m.winner === teamOf(this.session.mySeat);
+          audio.play(cheer ? 'win' : 'lose');
+          if (cheer) this.renderer.celebrate();
+        }
+        window.setTimeout(() => !this.destroyed && this.hooks.onEnd(this.state, { forfeit: m.forfeit, ratings: m.ratings, shots: this.shots }), 1600);
         break;
       case 'error':
         if (m.code === 'not_your_turn' || m.code === 'invalid_shot') {
@@ -850,6 +856,7 @@ export class GameController {
 
   pointerDown(px: number, py: number, id: number): boolean {
     if (this.phase !== 'aim' || !this.isMyTurn() || this.paused) return false;
+    if (this.pointer.mode !== null) return false; // a second finger must not hijack the drag
     audio.unlock();
     const p = this.renderer.toBoard(px, py);
     const side = this.side();
@@ -949,6 +956,16 @@ export class GameController {
         this.pushHud();
       }
     }
+  }
+
+  /** The system took the touch away (gesture, call, lost capture): drop the drag without shooting. */
+  pointerCancel(id: number): void {
+    if (this.pointer.id !== id) return;
+    const mode = this.pointer.mode;
+    this.pointer = { mode: null, id: -1, startPx: { x: 0, y: 0 } };
+    this.pulling = null;
+    if (mode === 'pull') this.aim.power = 0;
+    this.pushHud();
   }
 
   private static HOLD_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'a', 'A', 'd', 'D', ',', '.']);

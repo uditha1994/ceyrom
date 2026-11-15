@@ -48,6 +48,7 @@ export function GameScreen() {
         if (!p.achievements.includes('tutorial')) p.update({ achievements: [...p.achievements, 'tutorial'], xp: p.xp + 60 });
         setTutorialDone(true);
       },
+      onAutoPause: () => setPaused(true),
     }, bgRef.current);
     ctrl.current = c;
     const ro = new ResizeObserver(() => {
@@ -61,15 +62,26 @@ export function GameScreen() {
     c.start();
     if (location.search.includes('debug')) (window as unknown as { __ceyrom: unknown }).__ceyrom = c;
     const onKey = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement)?.tagName === 'INPUT' && (e.target as HTMLInputElement).type !== 'range') return;
-      if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') {
-        if (!document.querySelector('dialog[open]')) {
+      const el = e.target as HTMLElement | null;
+      const tag = el?.tagName ?? '';
+      const dialogOpen = !!document.querySelector('dialog[open]');
+      if (e.key === 'Escape') {
+        if (!dialogOpen) {
           setPaused(true);
           e.preventDefault();
         }
         return;
       }
-      if (document.querySelector('dialog[open]')) return;
+      // sliders, selects and text fields handle their own keys; game shortcuts would double up
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || el?.isContentEditable) return;
+      if (dialogOpen) return;
+      if (e.key === 'p' || e.key === 'P') {
+        setPaused(true);
+        e.preventDefault();
+        return;
+      }
+      // Enter and Space on a focused button press that button, they don't also shoot
+      if ((tag === 'BUTTON' || tag === 'A' || tag === 'SUMMARY') && (e.key === ' ' || e.key === 'Enter')) return;
       if ((e.key === 'r' || e.key === 'R') && session.kind === 'practice') c.resetPractice();
       if ((e.key === 'h' || e.key === 'H') && session.kind === 'practice') void c.suggest();
       if (c.key(e)) e.preventDefault();
@@ -98,9 +110,11 @@ export function GameScreen() {
     go('menu', { replace: true });
   };
 
-  const onPointer = (e: React.PointerEvent<HTMLCanvasElement>, type: 'down' | 'move' | 'up') => {
+  const onPointer = (e: React.PointerEvent<HTMLCanvasElement>, type: 'down' | 'move' | 'up' | 'cancel') => {
     const c = ctrl.current;
     if (!c) return;
+    if (type === 'cancel') return c.pointerCancel(e.pointerId);
+    if (type === 'down' && e.pointerType === 'mouse' && e.button !== 0) return; // left button only
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -127,7 +141,8 @@ export function GameScreen() {
             onPointerDown={(e) => onPointer(e, 'down')}
             onPointerMove={(e) => onPointer(e, 'move')}
             onPointerUp={(e) => onPointer(e, 'up')}
-            onPointerCancel={(e) => onPointer(e, 'up')}
+            onPointerCancel={(e) => onPointer(e, 'cancel')}
+            onLostPointerCapture={(e) => onPointer(e, 'cancel')}
             onContextMenu={(e) => e.preventDefault()}
           />
           </div>
@@ -365,6 +380,23 @@ function Controls({ ctrl, onEmoji, emojiOpen, closeEmoji }: { ctrl: React.Mutabl
   const mySeat = useHud((s) => s.mySeat);
   const [drill, setDrill] = useState(session.drill ?? 'break');
   const kind = session.kind;
+  useEffect(() => {
+    if (!emojiOpen) return;
+    const away = (e: Event) => {
+      if (!(e.target as HTMLElement | null)?.closest?.('.emoji-wrap')) closeEmoji();
+    };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      closeEmoji();
+      e.stopPropagation(); // Escape closes the popover first, it doesn't also pause
+    };
+    document.addEventListener('pointerdown', away);
+    document.addEventListener('keydown', esc, true);
+    return () => {
+      document.removeEventListener('pointerdown', away);
+      document.removeEventListener('keydown', esc, true);
+    };
+  }, [emojiOpen, closeEmoji]);
   return (
     <div className="controls">
       <div className="control-row">
