@@ -163,6 +163,20 @@ export class GameController {
     return sideOf(this.state, this.session.mySeat);
   }
 
+  /** Computer players react now and then, the way someone across the table would. Never at your fouls. */
+  private aiReact(out: ShotOutcome): void {
+    const shooterIsAi = this.controllerOf(out.seat) === 'ai';
+    const watching = this.session.players.map((_, i) => i).filter((i) => i !== out.seat && this.controllerOf(i) === 'ai');
+    const onlooker = watching[Math.floor(Math.random() * watching.length)] ?? -1;
+    let seat = -1;
+    let emoji = '';
+    if (out.notes.includes('queen.covered')) [seat, emoji] = shooterIsAi ? [out.seat, '🎯'] : [onlooker, '👏'];
+    else if (out.scored >= 2) [seat, emoji] = shooterIsAi ? [out.seat, '🔥'] : [onlooker, '👏'];
+    else if (out.foul && shooterIsAi) [seat, emoji] = [out.seat, '😅'];
+    if (seat < 0 || Math.random() > 0.8) return;
+    window.setTimeout(() => !this.destroyed && this.react(seat, emoji, false), 550);
+  }
+
   private teamName(team: number): string {
     return this.session.players
       .filter((_, i) => teamOf(i) === team)
@@ -416,6 +430,7 @@ export class GameController {
       this.renderer.celebrate();
     }
     if (out.foul) haptic([40, 60, 40], useSettings.getState().vibration);
+    if (this.session.kind === 'ai') this.aiReact(out);
     if (out.scored >= 3) this.note('note.hatTrick', 'good', { name, n: out.scored });
 
     const k = this.session.kind;

@@ -149,19 +149,19 @@
   },
   "note": {
     "foul": {
-      "striker": "Foul: striker pocketed",
+      "striker": "Aiyo! Foul: striker pocketed",
       "lastCoin": "Foul: last coin before the queen",
       "oppLastCoin": "Foul: opponent's last coin"
     },
     "queen": {
       "pocketed": "Queen pocketed. Cover her now!",
-      "covered": "Queen covered by {{name}}",
+      "covered": "Niyamai! {{name}} covered the queen",
       "returned": "Queen back to the centre",
       "early": "Queen returned: pocket your own coin first"
     },
     "due": { "added": "Penalty coin owed", "paid": "Penalty coin returned to the board" },
     "turn": { "continue": "Shoot again", "timeout": "Time's up, turn passes" },
-    "hatTrick": "{{n}} in one shot!",
+    "hatTrick": "Shaa! {{n}} in one shot!",
     "cleared": "Board cleared. Setting up again",
     "coach": "Coach's line shown in olive",
     "disconnected": "{{name}} lost connection",
