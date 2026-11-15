@@ -39,6 +39,7 @@
     "dailyDone": "Done today in {{n}} shots"
   },
   "mode": {
+    "hint": "The queen in the middle starts a quick game ({{level}}).",
     "title": "Choose a game",
     "single": "Single player",
     "multi": "With others",
