@@ -84,10 +84,10 @@ export class GameController {
   private challengeDone = false;
   private hiddenAt = 0;
 
-  constructor(canvas: HTMLCanvasElement, session: SessionConfig, hooks: ControllerHooks) {
+  constructor(canvas: HTMLCanvasElement, session: SessionConfig, hooks: ControllerHooks, boardLayer: HTMLCanvasElement | null = null) {
     this.session = session;
     this.hooks = hooks;
-    this.renderer = new Renderer(canvas);
+    this.renderer = new Renderer(canvas, boardLayer);
     this.state = session.initialState ? cloneState(session.initialState) : createMatch(session.rules, session.seats, session.seed);
     if (session.kind === 'practice' || session.kind === 'tutorial' || session.kind === 'challenge') this.setupSolo();
     this.applyLook();
@@ -195,9 +195,11 @@ export class GameController {
     this.aim.t = this.findPlacement(0);
     const fwd = toBoard(side, 0, -1);
     this.aim.dir = { x: fwd.x, y: fwd.y };
-    this.aim.power = 0;
+    this.aim.power = useSettings.getState().controls === 'point' && this.isMyTurn() ? this.lastPointPower : 0;
     this.coach = null;
     this.remoteAim = null;
+    this.snapView();
+    this.held.clear();
     if (this.session.kind === 'local') this.renderer.setView(side, first);
     const clock = this.state.config.shotClock;
     if (this.session.kind !== 'online') this.deadline = clock > 0 ? performance.now() + clock * 1000 : null;
@@ -278,6 +280,7 @@ export class GameController {
     if (this.phase !== 'aim' || !this.isMyTurn() || this.paused) return;
     if (this.aim.power < 0.02) this.aim.power = 0.55;
     const input: ShotInput = { t: this.aim.t, dx: this.aim.dir.x, dy: this.aim.dir.y, power: this.aim.power };
+    if (useSettings.getState().controls === 'point') this.lastPointPower = this.aim.power;
     this.fire(input);
   }
 
@@ -302,6 +305,7 @@ export class GameController {
   }
 
   private beginShot(input: ShotInput): void {
+    this.held.clear();
     this.lastInput = { ...input };
     this.lastPre = cloneState(this.state);
     this.world = shotWorld(this.state, input, true);
@@ -727,7 +731,13 @@ export class GameController {
     window.setTimeout(() => useHud.getState().patch({ notes: useHud.getState().notes.filter((n) => n.id !== id) }), 2600);
   }
 
+  /** Mark the HUD stale; it is written at most once per animation frame. */
   private pushHud(): void {
+    this.hudDirty = true;
+  }
+
+  private flushHud(): void {
+    this.hudDirty = false;
     const s = this.state;
     const players = this.session.players.map((p, seat) => {
       const team = teamOf(seat);
@@ -767,11 +777,43 @@ export class GameController {
 
   // ───────────────────────────── input ─────────────────────────────
 
+  private hudDirty = true;
+  /** What the player sees. It eases toward the real aim so every input glides instead of jumping. */
+  private view = { t: 0, dx: 0, dy: -1, power: 0 };
+  private held = new Set<string>();
+  private heldFor = 0;
+  private fine = false;
+  /** Offset between the finger and the striker centre along the baseline (t units). */
+  private grabDx = 0;
+  private powerTick = 0;
+  private lastPointPower = 0.5;
+
+  private snapView(): void {
+    this.view = { t: this.aim.t, dx: this.aim.dir.x, dy: this.aim.dir.y, power: this.aim.power };
+  }
+
+  /** Nearest legal spot to `target`: the striker slides around coins instead of sitting on them. */
+  private resolvePlacement(target: number): number {
+    const side = this.side();
+    const t = Math.max(-1, Math.min(1, target));
+    if (placementValid(this.state, side, t)) return t;
+    const first = this.aim.t <= t ? -1 : 1; // prefer the side the striker is coming from
+    for (let i = 1; i <= 250; i++) {
+      for (const dir of [first, -first]) {
+        const c = t + dir * i * 0.004;
+        if (c >= -1 && c <= 1 && placementValid(this.state, side, c)) return c;
+      }
+    }
+    return t;
+  }
+
   setPlacement(t: number): void {
     if (this.phase !== 'aim' || !this.isMyTurn()) return;
-    const c = Math.max(-1, Math.min(1, t));
-    if (Math.abs(c - this.aim.t) > 0.004) audio.play('place');
-    this.tutorialMoved += Math.abs(c - this.aim.t);
+    const c = this.resolvePlacement(t);
+    const moved = Math.abs(c - this.aim.t);
+    if (moved < 1e-6) return;
+    if (moved > 0.004) audio.play('place');
+    this.tutorialMoved += moved;
     this.aim.t = c;
     if (this.tutorialStep === 0 && this.session.kind === 'tutorial' && this.tutorialMoved > 0.35) this.setTutorialStep(1);
     this.sendPreview();
@@ -781,8 +823,20 @@ export class GameController {
   setPower(p: number): void {
     if (this.phase !== 'aim' || !this.isMyTurn()) return;
     this.aim.power = Math.max(0, Math.min(1, p));
+    this.powerFeedback();
     this.sendPreview();
     this.pushHud();
+  }
+
+  /** A soft tick and a tiny buzz each time power crosses a 10% step. */
+  private powerFeedback(): void {
+    const tick = Math.floor(this.aim.power * 10 + 1e-6);
+    if (tick === this.powerTick) return;
+    this.powerTick = tick;
+    if (this.aim.power > 0) {
+      audio.play('tick', this.aim.power);
+      haptic(tick >= 10 ? 12 : 4, useSettings.getState().vibration);
+    }
   }
 
   rotateAim(rad: number): void {
@@ -804,11 +858,14 @@ export class GameController {
     const local = toLocal(side, p.x, p.y);
     const minGrab = Math.max(STRIKER_R * 1.7, 26 / this.renderer.S);
     this.pointer = { mode: null, id, startPx: { x: px, y: py } };
+    this.powerTick = Math.floor(this.aim.power * 10);
     if (d < minGrab) {
-      // pressing the striker: slingshot aim (drag sideways first to place it)
+      // pressing the striker: pull back to shoot, or slide sideways to place it
       this.pointer.mode = 'pull';
+      this.grabDx = local.x / BOARD.baseHalf - this.aim.t;
     } else if (Math.abs(local.y - BOARD.baseline) < Math.max(40, 30 / this.renderer.S) && Math.abs(local.x) < BOARD.baseHalf + 40) {
       this.pointer.mode = 'place';
+      this.grabDx = 0;
       this.setPlacement(local.x / BOARD.baseHalf);
     } else {
       this.pointer.mode = 'point';
@@ -824,9 +881,16 @@ export class GameController {
     const l = Math.sqrt(dx * dx + dy * dy);
     if (l < 1) return;
     if (directionValid(this.side(), dx, dy)) this.aim.dir = { x: dx / l, y: dy / l };
-    if (this.aim.power === 0 && useSettings.getState().controls === 'point') this.aim.power = 0.5;
+    if (this.aim.power === 0 && useSettings.getState().controls === 'point') this.aim.power = this.lastPointPower;
     this.sendPreview();
     this.pushHud();
+  }
+
+  /** Pixels of pull before power starts; releasing inside it cancels. */
+  private static DEADZONE = 14;
+
+  private pullReach(): number {
+    return Math.max(110, Math.min(280, Math.min(this.renderer.w, this.renderer.h) * 0.34));
   }
 
   pointerMove(px: number, py: number, id: number): void {
@@ -835,30 +899,40 @@ export class GameController {
     const side = this.side();
     if (this.pointer.mode === 'place') {
       const local = toLocal(side, p.x, p.y);
-      this.setPlacement(local.x / BOARD.baseHalf);
+      this.setPlacement(local.x / BOARD.baseHalf - this.grabDx);
       return;
     }
     if (this.pointer.mode === 'point') {
       this.pointAt(p.x, p.y);
       return;
     }
-    // pull: dragging along the baseline before pulling back moves the striker
     const sp = strikerPos(side, this.aim.t);
-    const local = toLocal(side, p.x - sp.x, p.y - sp.y);
+    const rel = toLocal(side, p.x - sp.x, p.y - sp.y);
     const pxDist = Math.hypot(px - this.pointer.startPx.x, py - this.pointer.startPx.y);
-    if (this.aim.power === 0 && !this.pulling && Math.abs(local.x) > 2 * Math.abs(local.y) && pxDist > 6) {
-      const lp = toLocal(side, p.x, p.y);
-      this.setPlacement(lp.x / BOARD.baseHalf);
-      return;
+    // decide once what this drag is: a sideways slide places the striker, anything else pulls
+    if (!this.pulling) {
+      if (pxDist < 8) return;
+      if (Math.abs(rel.x) > 1.4 * Math.abs(rel.y)) {
+        this.pointer.mode = 'place';
+        this.setPlacement(toLocal(side, p.x, p.y).x / BOARD.baseHalf - this.grabDx);
+        return;
+      }
     }
     const dx = sp.x - p.x;
     const dy = sp.y - p.y;
     const l = Math.sqrt(dx * dx + dy * dy);
-    const screenMax = Math.min(this.renderer.w, this.renderer.h) * 0.3;
     const dPx = l * this.renderer.S;
-    this.aim.power = Math.max(0, Math.min(1, (dPx - 10) / screenMax));
-    if (l > 2 && directionValid(side, dx, dy)) this.aim.dir = { x: dx / l, y: dy / l };
-    this.pulling = this.aim.power > 0 ? p : null;
+    this.aim.power = Math.max(0, Math.min(1, (dPx - GameController.DEADZONE) / this.pullReach()));
+    // close to the striker a few pixels swing the angle a lot, so steady it there
+    if (l > 1 && directionValid(side, dx, dy)) {
+      const w = Math.max(0.2, Math.min(1, (dPx - GameController.DEADZONE) / 70));
+      const nx = this.aim.dir.x + (dx / l - this.aim.dir.x) * w;
+      const ny = this.aim.dir.y + (dy / l - this.aim.dir.y) * w;
+      const nl = Math.sqrt(nx * nx + ny * ny) || 1;
+      if (directionValid(side, nx, ny)) this.aim.dir = { x: nx / nl, y: ny / nl };
+    }
+    this.pulling = p;
+    this.powerFeedback();
     this.sendPreview();
     this.pushHud();
   }
@@ -869,7 +943,7 @@ export class GameController {
     this.pointer = { mode: null, id: -1, startPx: { x: 0, y: 0 } };
     if (mode === 'pull') {
       this.pulling = null;
-      if (this.aim.power > 0.03) this.shoot();
+      if (this.aim.power > 0.02) this.shoot();
       else {
         this.aim.power = 0;
         this.pushHud();
@@ -877,40 +951,95 @@ export class GameController {
     }
   }
 
+  private static HOLD_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'a', 'A', 'd', 'D', ',', '.']);
+
   key(e: KeyboardEvent): boolean {
     const k = e.key;
     if (k === 'Escape' || k === 'p' || k === 'P') return false; // handled by UI (pause)
+    this.fine = e.shiftKey;
     if (this.phase !== 'aim' || !this.isMyTurn() || this.paused) return false;
-    const fine = e.shiftKey;
+    if (GameController.HOLD_KEYS.has(k)) {
+      if (!e.repeat && !this.held.has(k)) {
+        // a tap nudges by a fixed small step; holding glides (see stepHeld)
+        this.held.add(k);
+        this.heldFor = 0;
+        this.applyKey(k, this.fine ? 0.25 : 1, 0.02);
+      }
+      return true;
+    }
+    if ((k === ' ' || k === 'Enter') && !e.repeat) {
+      this.shoot();
+      return true;
+    }
+    return false;
+  }
+
+  keyUp(e: KeyboardEvent): void {
+    this.fine = e.shiftKey;
+    this.held.delete(e.key);
+    // letters arrive in either case depending on Shift
+    this.held.delete(e.key.toLowerCase());
+    this.held.delete(e.key.toUpperCase());
+  }
+
+  releaseKeys(): void {
+    this.held.clear();
+  }
+
+  /** Move by `rate` units for `dt` seconds of a given key. */
+  private applyKey(k: string, scale: number, dt: number): void {
+    const step = scale * dt;
     switch (k) {
       case 'ArrowLeft':
-        this.setPlacement(this.aim.t - (fine ? 0.005 : 0.025));
-        return true;
+        return this.setPlacement(this.aim.t - 0.32 * step);
       case 'ArrowRight':
-        this.setPlacement(this.aim.t + (fine ? 0.005 : 0.025));
-        return true;
+        return this.setPlacement(this.aim.t + 0.32 * step);
       case 'a':
       case 'A':
       case ',':
-        this.rotateAim(-(fine ? 0.003 : 0.022));
-        return true;
+        return this.rotateAim(-0.22 * step);
       case 'd':
       case 'D':
       case '.':
-        this.rotateAim(fine ? 0.003 : 0.022);
-        return true;
+        return this.rotateAim(0.22 * step);
       case 'ArrowUp':
-        this.setPower(this.aim.power + (fine ? 0.01 : 0.04));
-        return true;
+        return this.setPower(this.aim.power + 0.5 * step);
       case 'ArrowDown':
-        this.setPower(this.aim.power - (fine ? 0.01 : 0.04));
-        return true;
-      case ' ':
-      case 'Enter':
-        this.shoot();
-        return true;
+        return this.setPower(this.aim.power - 0.5 * step);
     }
-    return false;
+  }
+
+  /** Held keys glide at a speed that ramps up, so short holds stay precise and long holds travel fast. */
+  private stepHeld(dt: number): void {
+    if (!this.held.size) return;
+    if (this.phase !== 'aim' || !this.isMyTurn() || this.paused) {
+      this.held.clear();
+      return;
+    }
+    this.heldFor += dt;
+    if (this.heldFor < 0.18) return;
+    const ramp = Math.min(1, 0.3 + (this.heldFor - 0.18) * 1.4);
+    const scale = (this.fine ? 0.22 : 1) * ramp * 2.2;
+    for (const k of this.held) this.applyKey(k, scale, dt);
+  }
+
+  /** Ease the visible striker, aim and power toward their targets (local input or remote preview). */
+  private easeView(dt: number): void {
+    const remote = !this.isMyTurn() && this.remoteAim ? this.remoteAim : null;
+    const src = remote ?? { t: this.aim.t, dx: this.aim.dir.x, dy: this.aim.dir.y, power: this.aim.power };
+    const v = this.view;
+    // remote previews arrive ~9 times a second, so blend them more slowly
+    const k = 1 - Math.exp(-dt * (remote ? 12 : 32));
+    const kp = 1 - Math.exp(-dt * (remote ? 12 : 45));
+    v.t += (src.t - v.t) * k;
+    if (Math.abs(src.t - v.t) < 1e-4) v.t = src.t;
+    const nx = v.dx + (src.dx - v.dx) * k;
+    const ny = v.dy + (src.dy - v.dy) * k;
+    const nl = Math.sqrt(nx * nx + ny * ny) || 1;
+    v.dx = nx / nl;
+    v.dy = ny / nl;
+    v.power += (src.power - v.power) * kp;
+    if (Math.abs(src.power - v.power) < 1e-3) v.power = src.power;
   }
 
   // ───────────────────────────── frame ─────────────────────────────
@@ -938,6 +1067,9 @@ export class GameController {
         }
       }
     }
+    this.stepHeld(dt);
+    this.easeView(dt);
+    if (this.hudDirty) this.flushHud();
     this.renderer.render(this.renderBodies(), this.aimView(), dt);
   };
 
@@ -957,9 +1089,7 @@ export class GameController {
         return { id: b.id, kind: b.kind, x, y, a: ang, active: b.active, speed: Math.sqrt(b.vx * b.vx + b.vy * b.vy) };
       });
     }
-    const side = this.side();
-    const t = this.remoteAim && !this.isMyTurn() ? this.remoteAim.t : this.aim.t;
-    const sp = strikerPos(side, t);
+    const sp = strikerPos(this.side(), this.view.t);
     const out: RenderBody[] = [{ id: 0, kind: 'striker', x: sp.x, y: sp.y, a: 0, active: this.phase !== 'over' || this.session.kind === 'challenge', speed: 0 }];
     for (const c of this.state.coins) if (c.on) out.push({ id: c.id, kind: c.kind, x: c.x, y: c.y, a: c.a, active: true, speed: 0 });
     return out;
@@ -973,18 +1103,19 @@ export class GameController {
     const solo = this.session.kind === 'practice' || this.session.kind === 'tutorial';
     const remote = !mine && this.remoteAim;
     const ai = this.controllerOf(this.state.turn) === 'ai';
-    const dir = remote ? { x: this.remoteAim!.dx, y: this.remoteAim!.dy } : mine || ai ? this.aim.dir : null;
-    const power = remote ? this.remoteAim!.power : this.aim.power;
-    const t = remote ? this.remoteAim!.t : this.aim.t;
+    const v = this.view;
+    const targetT = remote ? this.remoteAim!.t : this.aim.t;
+    const dir = remote || mine || ai ? { x: v.dx, y: v.dy } : null;
     return {
       side: this.side(),
-      t,
-      valid: placementValid(this.state, this.side(), t),
-      dir: ai && power === 0 ? null : dir,
-      power,
+      t: v.t,
+      valid: placementValid(this.state, this.side(), targetT),
+      dir: ai && this.aim.power === 0 ? null : dir,
+      power: v.power,
       guide: solo ? 'full' : mine ? s.guide : 'short',
       interactive: mine && !moving,
       pulling: this.pulling,
+      cancel: mine && this.pointer.mode === 'pull' && this.pulling !== null && this.aim.power === 0,
       coach: this.coach,
       ghost: this.session.kind === 'practice' ? this.ghost : null,
       moving,

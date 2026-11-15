@@ -19,6 +19,7 @@ export function GameScreen() {
   const finish = useApp((s) => s.finish);
   const go = useApp((s) => s.go);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const bgRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const ctrl = useRef<GameController | null>(null);
   const [paused, setPaused] = useState(false);
@@ -47,7 +48,7 @@ export function GameScreen() {
         if (!p.achievements.includes('tutorial')) p.update({ achievements: [...p.achievements, 'tutorial'], xp: p.xp + 60 });
         setTutorialDone(true);
       },
-    });
+    }, bgRef.current);
     ctrl.current = c;
     const ro = new ResizeObserver(() => {
       const r = wrapRef.current!.getBoundingClientRect();
@@ -73,10 +74,16 @@ export function GameScreen() {
       if ((e.key === 'h' || e.key === 'H') && session.kind === 'practice') void c.suggest();
       if (c.key(e)) e.preventDefault();
     };
+    const onKeyUp = (e: KeyboardEvent) => c.keyUp(e);
+    const onBlur = () => c.releaseKeys();
     window.addEventListener('keydown', onKey);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
     return () => {
       ro.disconnect();
       window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
       c.destroy();
       ctrl.current = null;
     };
@@ -110,6 +117,8 @@ export function GameScreen() {
       <PlayerColumn which="them" />
       <div className="board-cell">
         <div className="board-wrap" ref={wrapRef}>
+          <div className="board-stack">
+          <canvas ref={bgRef} className="board-bg" aria-hidden />
           <canvas
             ref={canvasRef}
             className="board-canvas"
@@ -121,6 +130,7 @@ export function GameScreen() {
             onPointerCancel={(e) => onPointer(e, 'up')}
             onContextMenu={(e) => e.preventDefault()}
           />
+          </div>
           <Notes />
           <Banner />
           <Reactions />
@@ -376,7 +386,9 @@ function Controls({ ctrl, onEmoji, emojiOpen, closeEmoji }: { ctrl: React.Mutabl
           />
         </label>
         <label className="ctl-slider" htmlFor="ctl-power">
-          <span>{t('game.power')}</span>
+          <span>
+            {t('game.power')} <output htmlFor="ctl-power" className="power-readout">{Math.round(power * 100)}%</output>
+          </span>
           <input id="ctl-power" type="range" min={0} max={1} step={0.01} value={power} disabled={!canShoot} style={{ ['--fill' as string]: `${power * 100}%` }} onChange={(e) => ctrl.current?.setPower(Number(e.target.value))} />
         </label>
         <Button size="lg" onClick={() => ctrl.current?.shoot()} disabled={!canShoot || !valid} id="btn-shoot">

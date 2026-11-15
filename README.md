@@ -102,14 +102,19 @@ The tutorial in the app (**How to play** on the main menu) walks through this on
 
 | Action | Touch / mouse | Keyboard |
 | --- | --- | --- |
-| Move striker | Drag along your baseline, or use the Striker slider | <kbd>←</kbd> <kbd>→</kbd> |
+| Move striker | Slide the striker sideways, drag along your baseline, or use the Striker slider | <kbd>←</kbd> <kbd>→</kbd> (tap to nudge, hold to glide) |
 | Aim | Press the striker and pull back (slingshot), or tap where to aim | <kbd>A</kbd> <kbd>D</kbd> |
 | Power | How far you pull back, or the Power slider | <kbd>↑</kbd> <kbd>↓</kbd> |
 | Shoot | Release, or press **Strike** | <kbd>Space</kbd> |
+| Cancel a shot | Drag back onto the striker (dashed ring) and release | <kbd>↓</kbd> to 0% |
 | Fine adjustment | — | Hold <kbd>Shift</kbd> |
 | Pause | Pause button | <kbd>Esc</kbd> |
 
-In Settings you can switch between **Pull back** and **Point and strike** aiming, and set the aim guide to Full, Short or Off.
+**Tips**
+- The striker slides around any coin sitting on your baseline, so wherever it rests is a legal spot.
+- The power ring around the striker fills olive, then brass, then red. Ticks mark 25, 50 and 75%, and the exact percentage shows beside the striker. You hear a soft click (and feel a light buzz on phones) at every 10%.
+
+In Settings you can switch between **Pull back** and **Point and strike** aiming, and set the aim guide to Full, Short or Off. Point and strike remembers your last power.
 
 ## Project structure
 
