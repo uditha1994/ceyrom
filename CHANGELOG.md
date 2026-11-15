@@ -4,6 +4,14 @@ All notable changes to Ceyrom are listed here. The format follows [Keep a Change
 
 ## [Unreleased]
 
+### Added
+
+- **Live table on the main menu:** two computer players play a real match in front of you, shown in perspective. Click the board to start a quick game.
+- **Board-shaped mode menu:** the four modes sit in the four quarters of a carrom board, and the queen in the centre starts a quick game.
+- **Coin tray:** each player card shows nine slots that fill as coins are pocketed, plus a queen slot.
+- **Table talk:** shot notes use "Aiyo!", "Shaa!" and "Niyamai!" (with Sinhala and Tamil equivalents), and computer players sometimes react with an emoji.
+- `CEYROM_GRACE_MS` server setting for the reconnect grace period.
+
 ### Changed
 
 - **Smoother striker:** the striker, aim and power ease toward your input instead of jumping, including the opponent's aim when you play online. Dragging keeps your grab point, and the striker slides around coins on the baseline.

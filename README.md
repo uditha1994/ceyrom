@@ -42,6 +42,7 @@ Flick the striker, pocket your coins, cover the queen: against the computer, wit
 | **Fair online play** | The server checks and simulates every shot, so results can't be faked. Dropped players reconnect without losing the game. Elo ratings and leaderboards: global, Sri Lanka, weekly, monthly and friends. |
 | **Learn and practise** | A five-step tutorial on a real board, practice drills with a coach that suggests a shot, instant replay, and a daily challenge that's the same for everyone. |
 | **Three languages** | English, Sinhala (සිංහල) and Tamil (தமிழ்) throughout, with fonts chosen for each script and local number and date formats. Quick-chat phrases appear in each reader's own language. |
+| **A menu that plays** | The main menu shows a live game: two computer players, Seeya and Achchi, play a real match in front of you, seen from a seat at the table. The mode menu is a carrom board itself, with the four modes in its four quarters and the queen in the centre starting a quick game. |
 | **Sri Lankan look** | Wood-grain boards, a lotus (pala peththa) centre, carved vine (liyawela) on the frame and brass corner plates. Board collection: Gedara Jak, Kandy Ebony, Galle Teak, Kitul Night. Strikers: ivory, brass, lacquer and moonstone. |
 | **Everywhere** | Phone, tablet and desktop, portrait and landscape. Touch, mouse and keyboard. Light and dark themes, reduced motion, battery saver and low-data mode. The computer, pass-and-play and practice modes work offline. |
 
@@ -49,14 +50,16 @@ Flick the striker, pocket your coins, cover the queen: against the computer, wit
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/screenshots/menu.jpg" alt="Main menu with the Ceyrom wordmark, Play and Quick game buttons, and tiles for each mode"><br><sub>Main menu</sub></td>
-    <td width="50%"><img src="docs/screenshots/practice.jpg" alt="Practice drill with the queen at the centre and the coach's suggested line drawn from the striker"><br><sub>Practice with the coach's suggested line</sub></td>
+    <td width="50%"><img src="docs/screenshots/menu.jpg" alt="Main menu with the Ceyrom wordmark, Play and Quick game buttons, and a carrom board in perspective where two computer players are mid-game"><br><sub>Main menu with a live game on the table</sub></td>
+    <td width="50%"><img src="docs/screenshots/mode-board.jpg" alt="Mode menu drawn as a carrom board: four modes in the four quarters, pockets in the corners and a red queen button in the centre"><br><sub>The mode menu is a board; the queen starts a quick game</sub></td>
   </tr>
   <tr>
+    <td><img src="docs/screenshots/practice.jpg" alt="Practice drill with the queen at the centre and the coach's suggested line drawn from the striker"><br><sub>Practice with the coach's suggested line</sub></td>
     <td><img src="docs/screenshots/online-room.jpg" alt="Online room showing code JRWG, two seated players and room chat"><br><sub>Private online room with invite code and quick chat</sub></td>
-    <td><img src="docs/screenshots/local-tamil.jpg" alt="Four-player pass-and-play in Tamil on a landscape phone, with a shot clock ring on the active player"><br><sub>Four players on one phone, in Tamil</sub></td>
   </tr>
 </table>
+
+<p align="center"><img src="docs/screenshots/local-tamil.jpg" alt="Four-player pass-and-play in Tamil on a landscape phone, with a shot clock ring on the active player" width="640"><br><sub>Four players on one phone, in Tamil</sub></p>
 
 <p align="center"><img src="docs/screenshots/phone-sinhala.jpg" alt="Phone game screen in Sinhala" width="300"><br><sub>Phone layout in Sinhala</sub></p>
 
@@ -112,6 +115,7 @@ The tutorial in the app (**How to play** on the main menu) walks through this on
 
 **Tips**
 - The striker slides around any coin sitting on your baseline, so wherever it rests is a legal spot.
+- Each player card has a coin tray: nine slots that fill as that side's coins go down, and a queen slot that glows while the queen needs covering.
 - The power ring around the striker fills olive, then brass, then red. Ticks mark 25, 50 and 75%, and the exact percentage shows beside the striker. You hear a soft click (and feel a light buzz on phones) at every 10%.
 
 In Settings you can switch between **Pull back** and **Point and strike** aiming, and set the aim guide to Full, Short or Off. Point and strike remembers your last power.
@@ -130,6 +134,7 @@ ceyrom/
 │   │   ├── controller.ts  game loop, input, AI turns, online sync
 │   │   ├── renderer.ts    canvas drawing and effects
 │   │   ├── textures.ts    procedural board and coins
+│   │   ├── demo.ts        the self-playing table on the main menu
 │   │   └── audio.ts       synthesised sound and music
 │   ├── net/           # reconnecting WebSocket client
 │   ├── store/         # Zustand stores (settings, profile, HUD)
@@ -173,6 +178,7 @@ One Node process serves the game, the API and the WebSocket on the same port.
 | `CEYROM_SECRET` | generated | Key that signs player tokens; kept in `CEYROM_DATA/secret.key` if unset |
 | `CEYROM_DATA` | `./data` | Where player and match data is saved |
 | `CEYROM_ORIGINS` | any | Allowed browser origins (comma-separated) when the client is hosted elsewhere |
+| `CEYROM_GRACE_MS` | `60000` | How long a disconnected player may take to return before forfeiting |
 | `VITE_SERVER_URL` | same origin | Set at build time when the client and server are on different domains |
 
 Health check: `GET /api/health`. Leaderboard: `GET /api/leaderboard?scope=global|lk|weekly|monthly|friends`.
