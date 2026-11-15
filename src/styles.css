@@ -1426,6 +1426,48 @@ input[type='range']:disabled {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+.tray {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 6px;
+  border-radius: 99px;
+  background: var(--bg-2);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.tray i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45);
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  transition:
+    background-color 0.3s ease,
+    transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1.4);
+}
+.tray i.on {
+  box-shadow: 0 0 0 1px rgba(198, 168, 120, 0.75);
+  transform: scale(1.08);
+}
+.tray i.on.white {
+  background: #eedfc2;
+}
+.tray i.on.black {
+  background: #2e241e;
+}
+.tray i.q {
+  margin-left: 3px;
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--queen) 70%, transparent);
+  background: transparent;
+}
+.tray i.q.on {
+  background: var(--queen);
+  box-shadow: 0 0 0 1.5px #d9b978;
+}
+.tray i.q.wait {
+  animation: glow 0.9s ease-in-out infinite alternate;
+  background: color-mix(in srgb, var(--queen) 55%, transparent);
+}
 .coins {
   display: inline-flex;
   align-items: center;
@@ -1831,6 +1873,14 @@ input[type='range']:disabled {
   }
   .seats-4 .pcard-meta .coins small {
     display: none;
+  }
+  .seats-4 .tray {
+    gap: 2px;
+    padding: 2px 4px;
+  }
+  .seats-4 .tray i {
+    width: 7px;
+    height: 7px;
   }
 }
 

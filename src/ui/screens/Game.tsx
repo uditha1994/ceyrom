@@ -284,6 +284,8 @@ function PlayerCard({ p, seat, active }: { p: HudPlayer; seat: number; active: b
   const clockMs = useHud((s) => (s.turn === seat ? s.clockMs : null));
   const clockTotal = useHud((s) => s.clockTotal);
   const variant = useHud((s) => s.variant);
+  const queen = useHud((s) => s.queen);
+  const queenTeam = useHud((s) => s.queenTeam);
   const frac = clockMs !== null && clockTotal > 0 ? clockMs / clockTotal : null;
   const low = frac !== null && frac < 0.25;
   return (
@@ -299,8 +301,15 @@ function PlayerCard({ p, seat, active }: { p: HudPlayer; seat: number; active: b
         </div>
         <div className="pcard-meta">
           {variant === 'standard' && p.color ? (
-            <span className="coins" aria-label={t('game.coinsLeft', { n: p.remaining })}>
-              <CoinDot kind={p.color} /> <b>{fmtNumber(p.remaining)}</b> <small>{t('game.left')}</small>
+            <span className="coins" role="img" aria-label={t('game.coinsLeft', { n: p.remaining })}>
+              {/* like the row of pocketed coins each player keeps beside the board */}
+              <span className="tray" aria-hidden>
+                {Array.from({ length: 9 }, (_, i) => (
+                  <i key={i} className={i < p.pocketed ? `on ${p.color}` : ''} />
+                ))}
+                <i className={`q${queen === 'covered' && queenTeam === p.team ? ' on' : queen === 'pending' && queenTeam === p.team ? ' wait' : ''}`} />
+              </span>
+              <b>{fmtNumber(p.remaining)}</b> <small>{t('game.left')}</small>
             </span>
           ) : (
             <span className="coins">
