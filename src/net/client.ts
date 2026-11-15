@@ -2,7 +2,7 @@
  * WebSocket client with automatic reconnection (exponential backoff + jitter)
  * and room resumption after network drops.
  */
-import type { ClientMsg, ServerMsg } from '../core/protocol';
+import type { ClientMsg, RoomInfo, ServerMsg } from '../core/protocol';
 import { useProfile, useSettings } from '../store/stores';
 import { loadSession, saveSession } from '../store/storage';
 
@@ -22,6 +22,8 @@ class NetClient {
   token: string | null = null;
   playerId: string | null = null;
   room: string | null = null;
+  /** Last room snapshot from the server, so screens mounted later don't start blank. */
+  lastRoom: { room: RoomInfo; you: { seat: number; spectator: boolean } } | null = null;
   rtt = 0;
   private pingTimer: number | null = null;
 
@@ -98,8 +100,10 @@ class NetClient {
       if (m.type === 'pong') this.rtt = performance.now() - m.t;
       if (m.type === 'room') {
         this.room = m.room.code;
+        this.lastRoom = { room: m.room, you: m.you };
         saveSession('ceyrom.room', m.room.code);
       }
+      if (m.type === 'error' && m.code === 'room_not_found') this.forgetRoom();
       for (const l of this.listeners) l(m);
     };
     ws.onclose = () => {
@@ -145,8 +149,13 @@ class NetClient {
   }
 
   leaveRoom(): void {
-    this.send({ type: 'leave' });
+    if (this.room || this.lastRoom) this.send({ type: 'leave' });
+    this.forgetRoom();
+  }
+
+  private forgetRoom(): void {
     this.room = null;
+    this.lastRoom = null;
     saveSession('ceyrom.room', null);
   }
 

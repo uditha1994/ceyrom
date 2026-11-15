@@ -29,6 +29,10 @@ export function GameScreen() {
 
   const onEnd = useCallback(
     (state: MatchState, extra: { forfeit?: boolean; ratings?: Record<string, { before: number; after: number }>; shots: number }) => {
+      if (session.spectator) {
+        finish({ session, state, myTeam: -1, xp: 0, achievements: [], forfeit: extra.forfeit, shots: extra.shots });
+        return;
+      }
       const prof = useProfile.getState();
       const myId = net.playerId ?? '';
       const ratingAfter = extra.ratings?.[myId]?.after;
@@ -433,7 +437,9 @@ function Controls({ ctrl, onEmoji, emojiOpen, closeEmoji }: { ctrl: React.Mutabl
         </Button>
       </div>
       <div className="control-row secondary">
-        <span className="hint ctl-hint">{canShoot ? t(controls === 'slingshot' ? 'game.hintSling' : 'game.hintPoint') : phase === 'moving' ? '' : t('game.hintWait')}</span>
+        <span className="hint ctl-hint">
+          {session.spectator ? t('lobby.watching') : canShoot ? t(controls === 'slingshot' ? 'game.hintSling' : 'game.hintPoint') : phase === 'moving' ? '' : t('game.hintWait')}
+        </span>
         <div className="row tight">
           {kind === 'practice' && (
             <>

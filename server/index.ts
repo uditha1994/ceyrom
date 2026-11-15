@@ -3,6 +3,7 @@
  * and the WebSocket endpoint at /ws.
  *
  *   PORT=8787 CEYROM_DATA=./data CEYROM_SECRET=... node dist-server/server.mjs
+ *   CEYROM_GRACE_MS (optional): how long a disconnected player may take to return, default 60000
  */
 import { createServer } from 'node:http';
 import { existsSync, readFileSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -33,7 +34,8 @@ function secret(): string {
 }
 
 const store = new JsonStore(join(DATA, 'ceyrom-db.json'));
-const game = new GameServer(store, { secret: secret() });
+const graceMs = Number(process.env.CEYROM_GRACE_MS);
+const game = new GameServer(store, { secret: secret(), ...(graceMs > 0 ? { graceMs } : {}) });
 
 const TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
