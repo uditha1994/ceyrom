@@ -33,6 +33,8 @@ export interface AimView {
   ghost: { x: number; y: number }[] | null;
   /** true when the shot is in flight (hide aim UI) */
   moving: boolean;
+  /** Pulling, but back inside the cancel zone: release does nothing. */
+  cancel?: boolean;
 }
 
 interface Particle {
@@ -81,6 +83,10 @@ export class Renderer {
   quality: 'high' | 'low' = 'high';
   reducedMotion = false;
   private boardTex: HTMLCanvasElement | null = null;
+  /** Static board layer: drawn once per size/theme, rotated and faded by CSS (GPU compositing). */
+  private bg: HTMLCanvasElement | null;
+  private bgDirty = true;
+  private bgStyle = '';
   private sprites = new Map<string, HTMLCanvasElement>();
   private particles: Particle[] = [];
   private pockets: PocketAnim[] = [];
@@ -90,9 +96,10 @@ export class Renderer {
   private flash: { pocket: number; t: number; gold: boolean }[] = [];
   private time = 0;
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, bg: HTMLCanvasElement | null = null) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d', { alpha: true })!;
+    this.bg = bg;
   }
 
   setLook(themeId: string, skin: string, quality: 'high' | 'low', reducedMotion: boolean): void {
@@ -107,10 +114,11 @@ export class Renderer {
   invalidate(): void {
     this.boardTex = null;
     this.sprites.clear();
+    this.bgDirty = true;
   }
 
   resize(w: number, h: number, dpr: number): void {
-    const d = this.quality === 'low' ? 1 : Math.min(dpr, 2.5);
+    const d = this.quality === 'low' ? 1 : Math.min(dpr, 2);
     if (w === this.w && h === this.h && d === this.dpr) return;
     this.w = w;
     this.h = h;
@@ -119,6 +127,12 @@ export class Renderer {
     this.canvas.height = Math.round(h * d);
     this.canvas.style.width = `${w}px`;
     this.canvas.style.height = `${h}px`;
+    if (this.bg) {
+      this.bg.width = Math.round(w * d);
+      this.bg.height = Math.round(h * d);
+      this.bg.style.width = `${w}px`;
+      this.bg.style.height = `${h}px`;
+    }
     this.S = Math.min(w, h) / (2 * FULL);
     this.cx = w / 2;
     this.cy = h / 2;
@@ -219,23 +233,25 @@ export class Renderer {
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.clearRect(0, 0, this.w, this.h);
     if (!this.boardTex) this.boardTex = boardTexture(boardTheme(this.themeId), this.texScale());
+    const zoom = 0.94 + 0.06 * ease;
 
-    // board
+    // board: a separate, static layer when available (no per-frame blit of the big texture)
+    if (this.bg) {
+      if (this.bgDirty) this.drawBg();
+      const style = `rotate(${this.angle.toFixed(4)}rad) scale(${zoom.toFixed(4)})|${ease.toFixed(3)}`;
+      if (style !== this.bgStyle) {
+        this.bgStyle = style;
+        const [tf, op] = style.split('|');
+        this.bg.style.transform = tf;
+        this.bg.style.opacity = op;
+      }
+    }
     ctx.save();
     ctx.globalAlpha = ease;
     ctx.translate(this.cx, this.cy);
-    const zoom = 0.94 + 0.06 * ease;
     ctx.scale(zoom, zoom);
-    // drop shadow under the whole board
-    ctx.save();
-    ctx.shadowColor = 'rgba(10,6,4,0.55)';
-    ctx.shadowBlur = 28 * this.dpr;
-    ctx.shadowOffsetY = 10;
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(-FULL * S * 0.98, -FULL * S * 0.98, FULL * S * 1.96, FULL * S * 1.96);
-    ctx.restore();
     ctx.rotate(this.angle);
-    ctx.drawImage(this.boardTex, -FULL * S, -FULL * S, 2 * FULL * S, 2 * FULL * S);
+    if (!this.bg) ctx.drawImage(this.boardTex, -FULL * S, -FULL * S, 2 * FULL * S, 2 * FULL * S);
 
     // pocket flashes
     for (const f of this.flash) {
@@ -532,6 +548,16 @@ export class Renderer {
     }
   }
 
+  private drawBg(): void {
+    const bg = this.bg!;
+    const ctx = bg.getContext('2d')!;
+    const S = this.S;
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.clearRect(0, 0, this.w, this.h);
+    ctx.drawImage(this.boardTex!, this.cx - FULL * S, this.cy - FULL * S, 2 * FULL * S, 2 * FULL * S);
+    this.bgDirty = false;
+  }
+
   private drawStrikerUi(ctx: CanvasRenderingContext2D, striker: RenderBody, aim: AimView): void {
     const S = this.S;
     const p = this.toScreen(striker.x, striker.y);
@@ -553,21 +579,77 @@ export class Renderer {
       ctx.lineWidth = 2 * S;
       ctx.stroke();
     }
-    if (aim.power > 0.001 && aim.dir) {
-      const R = (STRIKER_R + 8) * S;
-      const start = -Math.PI / 2;
+    const R = (STRIKER_R + 9) * S;
+    const start = -Math.PI / 2;
+    if (aim.cancel) {
+      // inside the cancel zone: grey ring, release does nothing
       ctx.beginPath();
       ctx.arc(p.x, p.y, R, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(48,37,30,0.35)';
-      ctx.lineWidth = 3.6 * S;
+      ctx.strokeStyle = 'rgba(232,217,188,0.35)';
+      ctx.setLineDash([3 * S, 3 * S]);
+      ctx.lineWidth = 2.4 * S;
       ctx.stroke();
+      ctx.setLineDash([]);
+    } else if (aim.power > 0.001 && aim.dir) {
+      const pw = Math.min(1, aim.power);
+      // track
       ctx.beginPath();
-      ctx.arc(p.x, p.y, R, start, start + aim.power * Math.PI * 2);
-      const hue = aim.power < 0.5 ? '#66705A' : aim.power < 0.85 ? '#C6A878' : '#A33326';
+      ctx.arc(p.x, p.y, R, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(30,22,17,0.45)';
+      ctx.lineWidth = 5 * S;
+      ctx.stroke();
+      // fill: olive → brass → lacquer red as power rises
+      const hue = pw < 0.45 ? '#7E8A69' : pw < 0.8 ? '#C6A878' : '#B23A2C';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, R, start, start + pw * Math.PI * 2);
       ctx.strokeStyle = hue;
-      ctx.lineWidth = 3.6 * S;
+      ctx.lineWidth = 5 * S;
       ctx.lineCap = 'round';
       ctx.stroke();
+      ctx.lineCap = 'butt';
+      // quarter ticks so 25/50/75% are easy to hit
+      for (let k = 1; k < 4; k++) {
+        const a = start + (k / 4) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(p.x + Math.cos(a) * (R - 3.6 * S), p.y + Math.sin(a) * (R - 3.6 * S));
+        ctx.lineTo(p.x + Math.cos(a) * (R + 3.6 * S), p.y + Math.sin(a) * (R + 3.6 * S));
+        ctx.strokeStyle = 'rgba(30,22,17,0.6)';
+        ctx.lineWidth = 1.2 * S;
+        ctx.stroke();
+      }
+      if (pw >= 0.995) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, R + (4 + 2 * Math.sin(this.time * 10)) * S, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(178,58,44,0.5)';
+        ctx.lineWidth = 1.5 * S;
+        ctx.stroke();
+      }
+      // percentage label beside the striker (not behind it, where a thumb pulling back would cover it)
+      if (aim.interactive) {
+        const d = aim.dir;
+        const len = Math.sqrt(d.x * d.x + d.y * d.y) || 1;
+        let ox = -d.y / len;
+        let oy = d.x / len;
+        // keep the label on the side facing the middle of the board
+        if (ox * -striker.x + oy * -striker.y < 0) {
+          ox = -ox;
+          oy = -oy;
+        }
+        const q = this.toScreen(striker.x + ox * (STRIKER_R + 30), striker.y + oy * (STRIKER_R + 30));
+        const label = `${Math.round(pw * 100)}%`;
+        const fs = Math.max(11, 13 * S);
+        ctx.font = `700 ${fs}px Yaldevi, Catamaran, system-ui, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const tw = ctx.measureText(label).width + fs * 0.9;
+        ctx.fillStyle = 'rgba(36,27,22,0.85)';
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(q.x - tw / 2, q.y - fs * 0.8, tw, fs * 1.6, fs * 0.8);
+        else ctx.rect(q.x - tw / 2, q.y - fs * 0.8, tw, fs * 1.6);
+        ctx.fill();
+        ctx.fillStyle = '#F1E6CF';
+        ctx.fillText(label, q.x, q.y + 0.5);
+      }
     }
     if (aim.pulling) {
       const q = this.toScreen(aim.pulling.x, aim.pulling.y);
@@ -581,7 +663,7 @@ export class Renderer {
       ctx.setLineDash([]);
       ctx.beginPath();
       ctx.arc(q.x, q.y, 6 * S, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(232,217,188,0.35)';
+      ctx.fillStyle = aim.cancel ? 'rgba(232,217,188,0.2)' : 'rgba(232,217,188,0.35)';
       ctx.fill();
     }
   }
